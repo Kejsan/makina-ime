@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Shield, Menu, X, Globe } from 'lucide-react';
 import { Button } from './Button';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext.tsx';
 import { Link, useNavigate } from 'react-router-dom';
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
