@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Shield } from 'lucide-react';
+import { Shield, Mail, Lock } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -40,71 +40,96 @@ export const Auth = () => {
     };
 
     return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-            <div className="w-full max-w-md space-y-8">
+        <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#020617] to-black flex items-center justify-center p-4">
+            <div className="w-full max-w-md space-y-8 animate-in fade-in zoom-in duration-500">
                 <div className="text-center space-y-4">
                     <div className="flex justify-center">
-                        <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center border border-border shadow-2xl shadow-primary/20">
-                            <Shield className="w-8 h-8 text-primary" />
+                        <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shadow-[0_0_40px_-10px_rgba(234,179,8,0.3)]">
+                            <Shield className="w-10 h-10 text-primary" />
                         </div>
                     </div>
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-text to-muted bg-clip-text text-transparent">
-                        {isLogin ? 'Mirësevini në AutoAdmin' : 'Krijoni Llogarinë Tuaj'}
+                    <h2 className="text-4xl font-bold tracking-tight text-white">
+                        {isLogin ? 'Welcome Back' : 'Create Account'}
                     </h2>
-                    <p className="text-muted">
+                    <p className="text-muted-foreground text-lg">
                         {isLogin
-                            ? 'Access your fleet dashboard'
-                            : 'Mirëmbajtja e mjetit tuaj, e thjeshtuar me elegancë.'}
+                            ? 'Enter your credentials to access your fleet.'
+                            : 'Join the premium vehicle management platform.'}
                     </p>
                 </div>
 
-                <Card className="backdrop-blur-xl bg-surface/80">
+                <Card className="p-8 backdrop-blur-xl bg-card/40 border-primary/10 shadow-2xl">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <Input
-                            type="email"
-                            label="Adresa Email"
-                            placeholder="name@luxury.al"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                        <Input
-                            type="password"
-                            label="Fjalëkalimi"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground ml-1">Email</label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                                    <Input
+                                        type="email"
+                                        placeholder="name@example.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="pl-10 bg-background/50 border-input/50 focus:border-primary/50 transition-all hover:bg-background/80"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground ml-1">Password</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                                    <Input
+                                        type="password"
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="pl-10 bg-background/50 border-input/50 focus:border-primary/50 transition-all hover:bg-background/80"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
                         {error && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-500 text-sm">
+                            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm flex items-center animate-in fade-in slide-in-from-top-2">
+                                <Shield className="w-4 h-4 mr-2" />
                                 {error}
                             </div>
                         )}
 
-                        <Button type="submit" className="w-full" isLoading={loading}>
-                            {isLogin ? 'HYR' : 'VAZHDO'}
+                        <Button type="submit" className="w-full text-lg h-12 shadow-primary/25 shadow-lg hover:shadow-primary/40 transition-all" size="lg" isLoading={loading}>
+                            {isLogin ? 'Sign In' : 'Create Account'}
                         </Button>
                     </form>
 
-                    <div className="mt-6 flex items-center justify-between">
-                        <div className="h-px bg-border flex-1" />
-                        <span className="px-4 text-xs text-muted uppercase">
-                            {isLogin ? 'OR' : 'Keni një llogari?'}
-                        </span>
-                        <div className="h-px bg-border flex-1" />
-                    </div>
+                    <div className="mt-8">
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t border-border" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-background/0 px-2 text-muted-foreground bg-[#0b1221]">
+                                    {isLogin ? 'New to AutoAdmin?' : 'Already have an account?'}
+                                </span>
+                            </div>
+                        </div>
 
-                    <Button
-                        variant="ghost"
-                        className="w-full mt-4"
-                        onClick={() => setIsLogin(!isLogin)}
-                    >
-                        {isLogin ? 'Regjistrohu' : 'Hyr Tani'}
-                    </Button>
+                        <Button
+                            variant="ghost"
+                            className="w-full mt-4 hover:bg-primary/5 hover:text-primary"
+                            onClick={() => setIsLogin(!isLogin)}
+                        >
+                            {isLogin ? 'Create an account' : 'Sign in to your account'}
+                        </Button>
+                    </div>
                 </Card>
+                
+                <p className="text-center text-sm text-muted-foreground">
+                    By continuing, you agree to our Terms of Service and Privacy Policy.
+                </p>
             </div>
         </div>
     );
 };
+

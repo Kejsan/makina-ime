@@ -1,10 +1,5 @@
 import React from 'react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
+import { cn } from '../../lib/utils';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label?: string;
@@ -12,25 +7,28 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-    ({ className, label, error, ...props }, ref) => {
+    ({ className, type, label, error, ...props }, ref) => {
         return (
             <div className="w-full space-y-2">
                 {label && (
-                    <label className="text-sm font-medium text-muted uppercase tracking-wider">
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-foreground">
                         {label}
                     </label>
                 )}
                 <input
-                    ref={ref}
+                    type={type}
                     className={cn(
-                        'w-full bg-surface/50 border border-border rounded-lg px-4 py-3 text-text placeholder:text-muted/50 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200',
-                        error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
+                        "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                        error && 'border-destructive focus-visible:ring-destructive',
                         className
                     )}
+                    ref={ref}
                     {...props}
                 />
-                {error && <p className="text-sm text-red-500">{error}</p>}
+                {error && <p className="text-sm text-destructive font-medium">{error}</p>}
             </div>
         );
     }
 );
+Input.displayName = "Input";
+

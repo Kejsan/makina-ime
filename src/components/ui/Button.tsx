@@ -1,41 +1,42 @@
 import React from 'react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
+import { cn } from '../../lib/utils';
+import { Loader2 } from 'lucide-react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+    variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+    size?: 'default' | 'sm' | 'lg' | 'icon';
     isLoading?: boolean;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-    ({ className, variant = 'primary', isLoading, children, ...props }, ref) => {
-        const variants = {
-            primary: 'bg-primary text-background hover:bg-primary-hover font-bold shadow-lg shadow-primary/20',
-            secondary: 'bg-surface text-text hover:bg-surface/80 border border-border',
-            outline: 'bg-transparent border-2 border-primary text-primary hover:bg-primary/10',
-            ghost: 'bg-transparent text-muted hover:text-text hover:bg-surface/50',
-        };
-
+    ({ className, variant = 'default', size = 'default', isLoading, children, ...props }, ref) => {
         return (
             <button
                 ref={ref}
                 className={cn(
-                    'inline-flex items-center justify-center rounded-lg px-6 py-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
-                    variants[variant],
+                    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                    {
+                        'bg-primary text-primary-foreground hover:bg-primary/90': variant === 'default',
+                        'bg-destructive text-destructive-foreground hover:bg-destructive/90': variant === 'destructive',
+                        'border border-input bg-background hover:bg-accent hover:text-accent-foreground': variant === 'outline',
+                        'bg-secondary text-secondary-foreground hover:bg-secondary/80': variant === 'secondary',
+                        'hover:bg-accent hover:text-accent-foreground': variant === 'ghost',
+                        'text-primary underline-offset-4 hover:underline': variant === 'link',
+                        'h-10 px-4 py-2': size === 'default',
+                        'h-9 rounded-md px-3': size === 'sm',
+                        'h-11 rounded-md px-8': size === 'lg',
+                        'h-10 w-10': size === 'icon',
+                    },
                     className
                 )}
                 disabled={isLoading || props.disabled}
                 {...props}
             >
-                {isLoading ? (
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : null}
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {children}
             </button>
         );
     }
 );
+Button.displayName = "Button";
+

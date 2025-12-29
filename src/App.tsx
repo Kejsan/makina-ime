@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Auth } from './pages/Auth';
 import { Dashboard } from './pages/Dashboard';
+import { VehicleDetails } from './pages/VehicleDetails';
 import './i18n';
 
 // Protected Route Component
@@ -33,6 +34,14 @@ function App() {
               </PrivateRoute>
             }
           />
+          <Route
+            path="/vehicle/:id"
+            element={
+              <PrivateRoute>
+                <VehicleDetails />
+              </PrivateRoute>
+            }
+          />
         </Routes>
       </Router>
     </AuthProvider>
@@ -40,3 +49,4 @@ function App() {
 }
 
 export default App;
+
