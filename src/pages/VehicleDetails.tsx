@@ -8,13 +8,15 @@ import { Card } from '../components/ui/Card';
 import { ArrowLeft, Car, Wrench, DollarSign, FileText, Calendar } from 'lucide-react';
 import { ServiceLog } from '../components/ServiceLog';
 import { ExpenseTracker } from '../components/ExpenseTracker';
+import { DocumentManager } from '../components/DocumentManager';
+import { ReminderManager } from '../components/ReminderManager';
 
 export const VehicleDetails = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [vehicle, setVehicle] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'expenses' | 'documents'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'expenses' | 'documents' | 'reminders'>('overview');
 
     useEffect(() => {
         if (!id) return;
@@ -135,12 +137,10 @@ export const VehicleDetails = () => {
                     {activeTab === 'services' && <ServiceLog vehicleId={id!} />}
                     {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} />}
                     {activeTab === 'documents' && (
-                        <div className="text-center py-20 text-muted-foreground border border-dashed border-border rounded-xl">
-                            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                            <h3 className="text-lg font-medium">Document Storage</h3>
-                            <p className="mt-2 text-sm max-w-xs mx-auto">Upload and manage your vehicle documents, insurance papers, and licenses.</p>
-                            <Button variant="outline" className="mt-6 cursor-not-allowed opacity-50">Coming Soon</Button>
-                        </div>
+                        <DocumentManager />
+                    )}
+                    {activeTab === 'reminders' && (
+                        <ReminderManager />
                     )}
                 </div>
             </div>
