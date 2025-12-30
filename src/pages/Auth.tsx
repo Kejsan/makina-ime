@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/Makina Ime Logo.png';
 
 export const Auth = () => {
     useTranslation();
@@ -44,7 +45,7 @@ export const Auth = () => {
             <div className="w-full max-w-md space-y-8 animate-in fade-in zoom-in duration-500">
                 <div className="text-center space-y-4">
                     <div className="flex flex-col items-center gap-4 mb-8">
-                        <img src="/logo.png" alt="Makina Ime" className="h-20 w-auto object-contain animate-float" />
+                        <img src={logo} alt="Makina Ime" className="h-20 w-auto object-contain animate-float" />
                         <div className="text-center">
                             <h2 className="text-3xl font-bold tracking-tight text-foreground">
                                 {isLogin ? 'Welcome Back' : 'Create Account'}

@@ -16,6 +16,7 @@ import { cn } from '../../lib/utils';
 import { NotificationCenter } from '../NotificationCenter';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import logo from '../../assets/Makina Ime Logo.png';
 
 interface SidebarItemProps {
     icon: React.ElementType;
@@ -99,7 +100,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card/50 backdrop-blur-xl h-screen sticky top-0">
                 <div className="p-6 border-b border-border flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="Makina Ime" className="h-10 w-auto object-contain" />
+                        <img src={logo} alt="Makina Ime" className="h-10 w-auto object-contain" />
                     </div>
                     <div className="relative">
                         <button 
