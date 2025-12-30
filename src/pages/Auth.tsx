@@ -43,19 +43,17 @@ export const Auth = () => {
         <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#020617] to-black flex items-center justify-center p-4">
             <div className="w-full max-w-md space-y-8 animate-in fade-in zoom-in duration-500">
                 <div className="text-center space-y-4">
-                    <div className="flex justify-center">
-                        <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shadow-[0_0_40px_-10px_rgba(234,179,8,0.3)]">
-                            <Shield className="w-10 h-10 text-primary" />
+                    <div className="flex flex-col items-center gap-4 mb-8">
+                        <img src="/logo.png" alt="Makina Ime" className="h-20 w-auto object-contain animate-float" />
+                        <div className="text-center">
+                            <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                                {isLogin ? 'Welcome Back' : 'Create Account'}
+                            </h2>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                {isLogin ? 'Manage your premium fleet with ease' : 'Join the elite vehicle management platform'}
+                            </p>
                         </div>
                     </div>
-                    <h2 className="text-4xl font-bold tracking-tight text-white">
-                        {isLogin ? 'Welcome Back' : 'Create Account'}
-                    </h2>
-                    <p className="text-muted-foreground text-lg">
-                        {isLogin
-                            ? 'Enter your credentials to access your fleet.'
-                            : 'Join the premium vehicle management platform.'}
-                    </p>
                 </div>
 
                 <Card className="p-8 backdrop-blur-xl bg-card/40 border-primary/10 shadow-2xl">
@@ -110,7 +108,7 @@ export const Auth = () => {
                             </div>
                             <div className="relative flex justify-center text-xs uppercase">
                                 <span className="bg-background/0 px-2 text-muted-foreground bg-[#0b1221]">
-                                    {isLogin ? 'New to AutoAdmin?' : 'Already have an account?'}
+                                    {isLogin ? 'New to Makina Ime?' : 'Already have an account?'}
                                 </span>
                             </div>
                         </div>

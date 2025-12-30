@@ -50,3 +50,14 @@ export interface Reminder {
     completed: boolean;
     createdAt: Timestamp;
 }
+
+export interface AppNotification {
+    id: string;
+    userId: string;
+    reminderId?: string;
+    title: string;
+    body: string;
+    type: string; // 'tax' | 'insurance' | 'inspection' | 'maintenance' | 'other'
+    read: boolean;
+    createdAt: Timestamp;
+}

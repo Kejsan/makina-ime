@@ -10,30 +10,27 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Makina Ime - Menaxhimi i Automjeteve',
+        name: 'Makina Ime',
         short_name: 'Makina Ime',
-        description: 'Menaxhimi i plotë i flotës tuaj: servise, dokumenta, shpenzime.',
+        description: 'Premium Vehicle Management & Reminder System',
         theme_color: '#0B1120',
         background_color: '#0B1120',
         display: 'standalone',
+        scope: '/',
+        start_url: '/',
         orientation: 'portrait',
         categories: ['utilities', 'productivity', 'finance'],
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
+            src: 'icon.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'icon.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           }
         ]
       }
