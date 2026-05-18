@@ -12,6 +12,7 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "firebase": "^12.7.0",
+    "firebase-admin": "^13.10.0",
     "i18next": "^25.7.3",
     "i18next-http-backend": "^3.0.2",
     "lucide-react": "^0.562.0",

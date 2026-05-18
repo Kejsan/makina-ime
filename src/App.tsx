@@ -2,6 +2,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Auth } from './pages/Auth';
 import { Dashboard } from './pages/Dashboard';
+import { Landing } from './pages/Landing';
+import { LegalPage } from './pages/LegalPage';
+import { ProfileSettings } from './pages/ProfileSettings';
 import { VehicleDetails } from './pages/VehicleDetails';
 import './i18n';
 
@@ -25,12 +28,24 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/privacy" element={<LegalPage type="privacy" />} />
+          <Route path="/terms" element={<LegalPage type="terms" />} />
           <Route
-            path="/"
+            path="/app"
             element={
               <PrivateRoute>
                 <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+          <Route
+            path="/profile"
+            element={
+              <PrivateRoute>
+                <ProfileSettings />
               </PrivateRoute>
             }
           />

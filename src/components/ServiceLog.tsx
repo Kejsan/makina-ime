@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, Timestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, Timestamp, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Card } from './ui/Card';
@@ -8,6 +9,7 @@ import { Wrench, Calendar, Trash2, Plus, Gauge } from 'lucide-react';
 import type { ServiceRecord } from '../lib/types';
 
 export const ServiceLog = ({ vehicleId }: { vehicleId: string }) => {
+    const { user } = useAuth();
     const [services, setServices] = useState<ServiceRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -32,27 +34,58 @@ export const ServiceLog = ({ vehicleId }: { vehicleId: string }) => {
 
     const handleAddService = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!user) return;
         try {
-            await addDoc(collection(db, 'vehicles', vehicleId, 'services'), {
+            const serviceRef = doc(collection(db, 'vehicles', vehicleId, 'services'));
+            const expenseRef = doc(collection(db, 'vehicles', vehicleId, 'expenses'));
+            const serviceDate = Timestamp.fromDate(new Date(date));
+            const serviceCost = parseFloat(cost);
+            const serviceMileage = parseInt(mileage);
+            const batch = writeBatch(db);
+
+            batch.set(serviceRef, {
+                userId: user.uid,
+                vehicleId,
                 description,
-                date: Timestamp.fromDate(new Date(date)),
-                cost: parseFloat(cost),
-                mileage: parseInt(mileage),
+                date: serviceDate,
+                cost: serviceCost,
+                mileage: serviceMileage,
+                expenseId: expenseRef.id,
                 createdAt: Timestamp.now()
             });
+
+            batch.set(expenseRef, {
+                userId: user.uid,
+                vehicleId,
+                category: 'Maintenance',
+                amount: serviceCost,
+                date: serviceDate,
+                notes: `Service: ${description}`,
+                sourceType: 'service',
+                sourceId: serviceRef.id,
+                sourceLabel: description,
+                createdAt: Timestamp.now()
+            });
+
+            await batch.commit();
             setShowForm(false);
             setDescription('');
             setDate('');
             setCost('');
             setMileage('');
-        } catch (error) {
-            console.error(error);
+        } catch {
+            console.error('Service record creation failed');
         }
     };
 
-     const handleDelete = async (id: string) => {
+     const handleDelete = async (service: ServiceRecord) => {
         if (confirm('Delete this service record?')) {
-            await deleteDoc(doc(db, 'vehicles', vehicleId, 'services', id));
+            const batch = writeBatch(db);
+            batch.delete(doc(db, 'vehicles', vehicleId, 'services', service.id));
+            if (service.expenseId) {
+                batch.delete(doc(db, 'vehicles', vehicleId, 'expenses', service.expenseId));
+            }
+            await batch.commit();
         }
     };
 
@@ -143,7 +176,7 @@ export const ServiceLog = ({ vehicleId }: { vehicleId: string }) => {
                                 <div className="flex items-center gap-6">
                                     <span className="font-bold text-xl font-mono">€{service.cost.toFixed(2)}</span>
                                     <button 
-                                        onClick={() => handleDelete(service.id)} 
+                                        onClick={() => handleDelete(service)} 
                                         className="text-muted-foreground hover:text-destructive transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"
                                         title="Delete Record"
                                     >

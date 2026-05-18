@@ -68,8 +68,8 @@ export const ReminderManager = () => {
             setIsAdding(false);
             setTitle('');
             setDate('');
-        } catch (err) {
-            console.error(err);
+        } catch {
+            console.error('Reminder creation failed');
         } finally {
             setProcessing(false);
         }
@@ -81,8 +81,8 @@ export const ReminderManager = () => {
             await updateDoc(doc(db, 'reminders', id), {
                 completed: true
             });
-        } catch (err) {
-            console.error(err);
+        } catch {
+            console.error('Reminder completion failed');
         }
     };
 
@@ -90,8 +90,8 @@ export const ReminderManager = () => {
         if (!confirm('Delete this reminder?')) return;
         try {
             await deleteDoc(doc(db, 'reminders', id));
-        } catch (err) {
-            console.error(err);
+        } catch {
+            console.error('Reminder deletion failed');
         }
     };
 

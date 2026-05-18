@@ -16,6 +16,8 @@ export interface ServiceRecord {
     cost: number;
     mileage: number;
     vehicleId: string;
+    userId?: string;
+    expenseId?: string;
 }
 
 export interface ExpenseRecord {
@@ -25,18 +27,28 @@ export interface ExpenseRecord {
     date: Timestamp;
     notes?: string;
     vehicleId: string;
+    userId?: string;
+    sourceType?: 'manual' | 'service' | 'document';
+    sourceId?: string;
+    sourceLabel?: string;
 }
 
 export interface Document {
     id: string;
     name: string;
-    url: string;
+    url?: string;
     type: string; // 'insurance' | 'inspection' | 'tax' | 'other'
     uploadedAt: Timestamp;
     issueDate?: string | null;
     expiryDate?: string | null;
     vehicleId: string;
-    path: string; // Storage path reference
+    path: string; // Private R2 object key
+    storageProvider?: 'r2';
+    size?: number;
+    contentType?: string;
+    cost?: number;
+    expenseId?: string;
+    userId?: string;
 }
 
 export interface Reminder {

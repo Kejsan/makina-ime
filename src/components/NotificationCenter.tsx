@@ -46,8 +46,8 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
             await updateDoc(doc(db, 'users', user.uid, 'notifications', id), {
                 read: true
             });
-        } catch (err) {
-            console.error(err);
+        } catch {
+            console.error('Notification update failed');
         }
     };
 
@@ -67,8 +67,8 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
         if (!user) return;
         try {
             await deleteDoc(doc(db, 'users', user.uid, 'notifications', id));
-        } catch (err) {
-            console.error(err);
+        } catch {
+            console.error('Notification deletion failed');
         }
     };
 

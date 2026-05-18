@@ -3,12 +3,23 @@ import { Upload, FileText, Trash2, Download, AlertCircle, Loader2 } from 'lucide
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { Input } from './ui/Input';
-import { db, storage } from '../lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db } from '../lib/firebase';
+import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { useParams } from 'react-router-dom';
 import type { Document } from '../lib/types';
 import { useAuth } from '../context/AuthContext';
+import { callR2DocumentFunction } from '../lib/r2Documents';
+
+interface CreateUploadUrlResponse {
+    documentId: string;
+    key: string;
+    uploadUrl: string;
+    expiresIn: number;
+}
+
+interface DownloadUrlResponse {
+    downloadUrl: string;
+}
 
 export const DocumentManager = () => {
     const { id: vehicleId } = useParams<{ id: string }>();
@@ -20,6 +31,7 @@ export const DocumentManager = () => {
     const [documentType, setDocumentType] = useState('insurance');
     const [issueDate, setIssueDate] = useState('');
     const [expiryDate, setExpiryDate] = useState('');
+    const [cost, setCost] = useState('');
 
     const documentTypes = [
         { value: 'insurance', label: 'Insurance / TPL' },
@@ -70,45 +82,44 @@ export const DocumentManager = () => {
         setError('');
 
         try {
-            // 1. Upload to Firebase Storage
-            const storagePath = `vehicles/${vehicleId}/documents/${Date.now()}_${file.name}`;
-            const storageRef = ref(storage, storagePath);
-            await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(storageRef);
-
-            // 2. Save metadata to Firestore
-            await addDoc(collection(db, `vehicles/${vehicleId}/documents`), {
-                name: file.name,
-                url: downloadURL,
-                path: storagePath,
-                type: documentType,
-                uploadedAt: serverTimestamp(),
+            const uploadData = await callR2DocumentFunction<CreateUploadUrlResponse>(user, 'createUploadUrl', {
                 vehicleId,
-                issueDate: issueDate || null,
-                expiryDate: expiryDate || null
+                fileName: file.name,
+                contentType: file.type,
+                size: file.size,
             });
 
-            if (expiryDate) {
-                const typeLabel = documentTypes.find((type) => type.value === documentType)?.label || 'Document';
-                await addDoc(collection(db, 'reminders'), {
-                    userId: user.uid,
-                    vehicleId,
-                    title: `${typeLabel} renewal`,
-                    type: documentType,
-                    dueDate: Timestamp.fromDate(new Date(expiryDate)),
-                    leadTimeDays: 14,
-                    recurrence: documentType === 'insurance' || documentType === 'tax' ? 'yearly' : 'none',
-                    completed: false,
-                    createdAt: serverTimestamp()
-                });
+            const uploadResponse = await fetch(uploadData.uploadUrl, {
+                method: 'PUT',
+                headers: {
+                    'content-type': file.type,
+                },
+                body: file,
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error('R2 upload failed. Check bucket CORS and credentials.');
             }
+
+            await callR2DocumentFunction(user, 'finalizeUpload', {
+                vehicleId,
+                documentId: uploadData.documentId,
+                key: uploadData.key,
+                name: file.name,
+                type: documentType,
+                contentType: file.type,
+                size: file.size,
+                issueDate: issueDate || null,
+                expiryDate: expiryDate || null,
+                cost: cost ? parseFloat(cost) : 0,
+            });
 
             setIssueDate('');
             setExpiryDate('');
-
+            setCost('');
         } catch (err: unknown) {
-            console.error(err);
-            setError('Failed to upload document.');
+            console.error('Document upload failed');
+            setError(err instanceof Error ? err.message : 'Failed to upload document.');
         } finally {
             setUploading(false);
             // Reset input
@@ -116,20 +127,43 @@ export const DocumentManager = () => {
         }
     };
 
-    const handleDelete = async (docId: string, storagePath: string) => {
-        if (!confirm('Are you sure you want to delete this document?')) return;
-        if (!vehicleId) return;
+    const handleDownload = async (documentRecord: Document) => {
+        if (!user || !vehicleId) return;
 
         try {
-            // 1. Delete from Storage
-            const storageRef = ref(storage, storagePath);
-            await deleteObject(storageRef);
+            if (documentRecord.url) {
+                window.open(documentRecord.url, '_blank', 'noopener,noreferrer');
+                return;
+            }
 
-            // 2. Delete from Firestore
-            await deleteDoc(doc(db, `vehicles/${vehicleId}/documents`, docId));
+            const data = await callR2DocumentFunction<DownloadUrlResponse>(user, 'createDownloadUrl', {
+                vehicleId,
+                documentId: documentRecord.id,
+            });
+            window.open(data.downloadUrl, '_blank', 'noopener,noreferrer');
         } catch (err) {
-            console.error("Error deleting document:", err);
-            setError("Failed to delete document.");
+            console.error('Document download link creation failed');
+            setError(err instanceof Error ? err.message : 'Failed to create download link.');
+        }
+    };
+
+    const handleDelete = async (documentRecord: Document) => {
+        if (!confirm('Are you sure you want to delete this document?')) return;
+        if (!vehicleId || !user) return;
+
+        try {
+            if (documentRecord.storageProvider === 'r2') {
+                await callR2DocumentFunction(user, 'deleteDocument', {
+                    vehicleId,
+                    documentId: documentRecord.id,
+                });
+                return;
+            }
+
+            await deleteDoc(doc(db, `vehicles/${vehicleId}/documents`, documentRecord.id));
+        } catch (err) {
+            console.error('Document deletion failed');
+            setError(err instanceof Error ? err.message : "Failed to delete document.");
         }
     };
 
@@ -188,9 +222,17 @@ export const DocumentManager = () => {
                         onChange={(event) => setExpiryDate(event.target.value)}
                         disabled={uploading}
                     />
+                    <Input
+                        type="number"
+                        label="Cost (€)"
+                        placeholder="0.00"
+                        value={cost}
+                        onChange={(event) => setCost(event.target.value)}
+                        disabled={uploading}
+                    />
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
-                    Adding an expiry date creates a renewal reminder automatically.
+                    When R2 is configured, expiry dates will create reminders and document costs will be linked into expenses.
                 </p>
             </Card>
 
@@ -227,17 +269,15 @@ export const DocumentManager = () => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                <a 
-                                    href={doc.url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
+                                <button
+                                    onClick={() => handleDownload(doc)}
                                     className="p-2 hover:bg-accent rounded-full text-muted-foreground hover:text-foreground transition-colors"
                                     title="Download"
                                 >
                                     <Download className="w-4 h-4" />
-                                </a>
+                                </button>
                                 <button
-                                    onClick={() => handleDelete(doc.id, doc.path)}
+                                    onClick={() => handleDelete(doc)}
                                     className="p-2 hover:bg-destructive/10 rounded-full text-muted-foreground hover:text-destructive transition-colors"
                                     title="Delete"
                                 >

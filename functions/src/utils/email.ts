@@ -8,7 +8,7 @@ apiInstance.setApiKey(TransactionalEmailsApiApiKeys.apiKey, apiKey);
 
 export async function sendEmail({ to, subject, htmlContent }: { to: string, subject: string, htmlContent: string }) {
     if (!apiKey) {
-        console.error("Brevo API Key missing.");
+        console.error("Brevo API key is not configured.");
         return;
     }
 
@@ -20,10 +20,10 @@ export async function sendEmail({ to, subject, htmlContent }: { to: string, subj
 
     try {
         const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
-        console.log("Email sent successfully. ID: " + data.body.messageId);
+        console.log("Transactional email sent", { messageId: data.body.messageId });
         return data;
-    } catch (error) {
-        console.error("Error sending email:", error);
-        throw error;
+    } catch {
+        console.error("Transactional email provider failed");
+        throw new Error("Email delivery failed");
     }
 }

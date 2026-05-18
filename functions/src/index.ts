@@ -5,6 +5,13 @@ import { sendEmail } from "./utils/email";
 
 admin.initializeApp();
 
+const escapeHtml = (value: string) => value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 /**
  * Scheduled function that runs every day at 9:00 AM.
  * Checks for reminders due within their 'leadTime' and sends notifications.
@@ -13,13 +20,14 @@ export const checkReminders = onSchedule("every day 09:00", async () => {
     const db = admin.firestore();
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayKey = today.toISOString().slice(0, 10);
 
     try {
         const snapshot = await db.collection("reminders")
             .where("completed", "==", false)
             .get();
 
-        const notificationsToSend: { userId: string, email?: string, reminderId: string, title: string, body: string, type: string }[] = [];
+        const notificationsToSend: { userId: string, email?: string, reminderId: string, notificationId: string, title: string, body: string, type: string }[] = [];
 
         for (const doc of snapshot.docs) {
             const data = doc.data();
@@ -33,26 +41,34 @@ export const checkReminders = onSchedule("every day 09:00", async () => {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             if (diffDays <= leadTimeDays && diffDays >= 0) {
+                const notificationId = `${doc.id}_${todayKey}`;
+                const notificationRef = db.collection("users").doc(data.userId).collection("notifications").doc(notificationId);
+                const existingNotification = await notificationRef.get();
+
+                if (existingNotification.exists) {
+                    continue;
+                }
+
                 // Fetch user data for email
                 const userSnap = await db.collection("users").doc(data.userId).get();
                 const userData = userSnap.data();
+                const reminderTitle = String(data.title || "vehicle reminder").slice(0, 180);
 
                 notificationsToSend.push({
                     userId: data.userId,
                     email: userData?.email,
                     reminderId: doc.id,
-                    title: `Upcoming: ${data.title}`,
-                    body: `Your ${data.title} is due in ${diffDays} days.`,
+                    notificationId,
+                    title: `Upcoming: ${reminderTitle}`,
+                    body: `Your ${reminderTitle} is due in ${diffDays} days.`,
                     type: data.type
                 });
             }
         }
 
-        // Send Email and Write to Notifications collection
         const batch = db.batch();
         for (const notif of notificationsToSend) {
-            // Write to Firestore for in-app UI
-            const ref = db.collection("users").doc(notif.userId).collection("notifications").doc();
+            const ref = db.collection("users").doc(notif.userId).collection("notifications").doc(notif.notificationId);
             batch.set(ref, {
                 title: notif.title,
                 body: notif.body,
@@ -61,8 +77,13 @@ export const checkReminders = onSchedule("every day 09:00", async () => {
                 read: false,
                 createdAt: admin.firestore.FieldValue.serverTimestamp()
             });
+        }
 
-            // Send Email if we have one
+        if (notificationsToSend.length > 0) {
+            await batch.commit();
+        }
+
+        for (const notif of notificationsToSend) {
             if (notif.email) {
                 try {
                     await sendEmail({
@@ -71,21 +92,22 @@ export const checkReminders = onSchedule("every day 09:00", async () => {
                         htmlContent: `
                             <div style="font-family: sans-serif; padding: 20px;">
                                 <h2>Reminder Alert</h2>
-                                <p>${notif.body}</p>
+                                <p>${escapeHtml(notif.body)}</p>
                                 <a href="https://makinaime.dpdns.org" style="background: #0B1120; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Dashboard</a>
                             </div>
                         `
                     });
-                } catch (err) {
-                    console.error("Failed to send email to " + notif.email, err);
+                } catch {
+                    console.error("Failed to send reminder email", {
+                        userId: notif.userId,
+                        reminderId: notif.reminderId,
+                        notificationId: notif.notificationId,
+                    });
                 }
             }
         }
-        
-        await batch.commit();
-
-    } catch (error) {
-        console.error("Error checking reminders:", error);
+    } catch {
+        console.error("Error checking reminders");
     }
 });
 
@@ -95,6 +117,6 @@ export const checkReminders = onSchedule("every day 09:00", async () => {
 export const onReminderCreate = onDocumentCreated("reminders/{reminderId}", (event) => {
       const newValue = event.data?.data();
       if (!newValue) return null;
-      console.log('New reminder created:', newValue.title);
+      console.log("New reminder created", { reminderId: event.params.reminderId, userId: newValue.userId });
       return null;
     });

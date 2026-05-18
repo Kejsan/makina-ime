@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, Timestamp, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Card } from './ui/Card';
@@ -8,6 +9,7 @@ import { DollarSign, Calendar, Trash2, Plus, Tag } from 'lucide-react';
 import type { ExpenseRecord } from '../lib/types';
 
 export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
+    const { user } = useAuth();
     const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -18,7 +20,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
     const [date, setDate] = useState('');
     const [notes, setNotes] = useState('');
 
-    const categories = ['Fuel', 'Insurance', 'Tax', 'Parking', 'Tolls', 'Cleaning', 'Other'];
+    const categories = ['Fuel', 'Insurance', 'Tax', 'Parking', 'Tolls', 'Cleaning', 'Maintenance', 'Document', 'Other'];
 
     useEffect(() => {
         const q = query(
@@ -34,20 +36,24 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
 
     const handleAddExpense = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!user) return;
         try {
             await addDoc(collection(db, 'vehicles', vehicleId, 'expenses'), {
+                userId: user.uid,
+                vehicleId,
                 category,
                 amount: parseFloat(amount),
                 date: Timestamp.fromDate(new Date(date)),
                 notes,
+                sourceType: 'manual',
                 createdAt: Timestamp.now()
             });
             setShowForm(false);
             setAmount('');
             setDate('');
             setNotes('');
-        } catch (error) {
-            console.error(error);
+        } catch {
+            console.error('Expense creation failed');
         }
     };
 
@@ -55,6 +61,15 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
         if (confirm('Delete this expense?')) {
             await deleteDoc(doc(db, 'vehicles', vehicleId, 'expenses', id));
         }
+    };
+
+    const handleDeleteClick = async (expense: ExpenseRecord) => {
+        if (expense.sourceType && expense.sourceType !== 'manual') {
+            alert('This expense is linked to another record. Delete the related service or document instead.');
+            return;
+        }
+
+        await handleDelete(expense.id);
     };
 
     const totalStats = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
@@ -158,13 +173,18 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                                                     - {expense.notes}
                                                 </span>
                                             )}
+                                            {expense.sourceType && expense.sourceType !== 'manual' && (
+                                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                                                    linked {expense.sourceType}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <span className="font-bold text-lg font-mono">€{expense.amount.toFixed(2)}</span>
                                     <button 
-                                        onClick={() => handleDelete(expense.id)} 
+                                        onClick={() => handleDeleteClick(expense)} 
                                         className="text-muted-foreground hover:text-destructive transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"
                                         title="Delete Expense"
                                     >

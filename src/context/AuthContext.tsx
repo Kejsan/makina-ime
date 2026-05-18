@@ -17,11 +17,15 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export const useAuth = () => useContext(AuthContext);
 
 const upsertUserProfile = async (user: User, includeCreatedAt = false) => {
-    await setDoc(doc(db, 'users', user.uid), {
-        email: user.email,
-        updatedAt: serverTimestamp(),
-        ...(includeCreatedAt ? { createdAt: serverTimestamp() } : {})
-    }, { merge: true });
+    try {
+        await setDoc(doc(db, 'users', user.uid), {
+            email: user.email,
+            updatedAt: serverTimestamp(),
+            ...(includeCreatedAt ? { createdAt: serverTimestamp() } : {})
+        }, { merge: true });
+    } catch {
+        console.warn('User profile sync failed.');
+    }
 };
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {

@@ -6,7 +6,6 @@ import {
     LogOut, 
     Menu, 
     X, 
-    Shield,
     User,
     Bell
 } from 'lucide-react';
@@ -84,9 +83,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     };
 
     const navItems = [
-        { icon: LayoutDashboard, label: t('Dashboard'), href: '/' },
+        { icon: LayoutDashboard, label: t('Dashboard'), href: '/app' },
+        { icon: User, label: t('Profile Settings'), href: '/profile' },
         // { icon: Car, label: t('My Vehicles'), href: '/vehicles' }, // Future
-        // { icon: Settings, label: t('Settings'), href: '/settings' }, // Future
     ];
 
     return (
@@ -141,6 +140,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         <LogOut className="w-4 h-4 mr-2" />
                         {t('Sign Out')}
                     </Button>
+                    <div className="mt-3 flex gap-3 px-1 text-xs text-muted-foreground">
+                        <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+                        <Link to="/terms" className="hover:text-foreground">Terms</Link>
+                    </div>
                 </div>
             </aside>
 
@@ -159,8 +162,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             )}>
                  <div className="p-6 border-b border-border flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                        <Shield className="w-6 h-6 text-primary" />
-                        <span className="font-bold text-lg">AUTOADMIN</span>
+                        <img src={logo} alt="Makina Ime" className="h-9 w-auto object-contain" />
                     </div>
                     <button onClick={() => setIsMobileMenuOpen(false)}>
                         <X className="w-6 h-6 text-muted-foreground" />
@@ -187,6 +189,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         <LogOut className="w-4 h-4 mr-2" />
                         {t('Sign Out')}
                     </Button>
+                    <div className="mt-3 flex gap-3 px-1 text-xs text-muted-foreground">
+                        <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+                        <Link to="/terms" className="hover:text-foreground">Terms</Link>
+                    </div>
                 </div>
             </div>
 

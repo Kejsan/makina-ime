@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Shield, Mail, Lock } from 'lucide-react';
 import { Button } from '../components/ui/Button';
@@ -31,10 +31,12 @@ export const Auth = () => {
             } else {
                 await signUp(email, password);
             }
-            navigate('/');
+            navigate('/app');
         } catch (err: unknown) {
-            console.error(err);
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            console.error('Authentication failed');
+            setError(err instanceof Error && err.message.includes('auth/')
+                ? 'Sign-in failed. Check your email and password, then try again.'
+                : 'Authentication failed. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -125,7 +127,10 @@ export const Auth = () => {
                 </Card>
                 
                 <p className="text-center text-sm text-muted-foreground">
-                    By continuing, you agree to our Terms of Service and Privacy Policy.
+                    By continuing, you agree to our{' '}
+                    <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                    {' '}and{' '}
+                    <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
                 </p>
             </div>
         </div>

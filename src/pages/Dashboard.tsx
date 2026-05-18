@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Car as CarIcon, AlertCircle, Trash2, Calendar, Wrench, DollarSign } from 'lucide-react';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
+import { Plus, Car as CarIcon, AlertCircle, Trash2, Calendar, Bell, DollarSign, Receipt, Clock } from 'lucide-react';
+import { collection, query, where, onSnapshot, addDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,8 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Layout } from '../components/ui/Layout';
+import type { ExpenseRecord, Reminder } from '../lib/types';
+import { callR2DocumentFunction } from '../lib/r2Documents';
 
 interface Vehicle {
     id: string;
@@ -22,15 +24,18 @@ interface Vehicle {
     registrationExpiry?: Timestamp;
 }
 
-const StatCard = ({ icon: Icon, label, value, color }: { icon: React.ElementType, label: string, value: string, color: string }) => (
-    <Card className="p-6">
+const formatCurrency = (value: number) => `€${value.toFixed(2)}`;
+
+const StatCard = ({ icon: Icon, label, value, color, detail }: { icon: React.ElementType, label: string, value: string, color: string, detail?: string }) => (
+    <Card className="p-5">
         <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center`}>
-                <Icon className="w-6 h-6 text-white" />
+            <div className={`w-11 h-11 rounded-lg ${color} flex items-center justify-center shrink-0`}>
+                <Icon className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
                 <p className="text-sm font-medium text-muted-foreground">{label}</p>
                 <h3 className="text-2xl font-bold tracking-tight">{value}</h3>
+                {detail && <p className="text-xs text-muted-foreground mt-1 truncate">{detail}</p>}
             </div>
         </div>
     </Card>
@@ -41,8 +46,11 @@ export const Dashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+    const [expensesByVehicle, setExpensesByVehicle] = useState<Record<string, ExpenseRecord[]>>({});
+    const [reminders, setReminders] = useState<Reminder[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
 
     // Form State
     const [make, setMake] = useState('');
@@ -65,6 +73,52 @@ export const Dashboard = () => {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setVehicles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vehicle)));
             setLoading(false);
+        });
+
+        return unsubscribe;
+    }, [user]);
+
+    useEffect(() => {
+        if (!user || vehicles.length === 0) {
+            return;
+        }
+
+        const unsubscribes = vehicles.map((vehicle) => {
+            const q = query(
+                collection(db, 'vehicles', vehicle.id, 'expenses'),
+                orderBy('date', 'desc')
+            );
+
+            return onSnapshot(q, (snapshot) => {
+                setExpensesByVehicle((previous) => ({
+                    ...previous,
+                    [vehicle.id]: snapshot.docs.map((doc) => ({
+                        id: doc.id,
+                        ...doc.data()
+                    } as ExpenseRecord))
+                }));
+            });
+        });
+
+        return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+    }, [user, vehicles]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const q = query(
+            collection(db, 'reminders'),
+            where('userId', '==', user.uid),
+            where('completed', '==', false)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data()
+            } as Reminder));
+
+            setReminders(data.sort((a, b) => (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0)));
         });
 
         return unsubscribe;
@@ -96,42 +150,128 @@ export const Dashboard = () => {
             setVehicleType('car');
             setCurrentMileage('');
             setExpiry('');
-        } catch (error) {
-            console.error("Error adding vehicle: ", error);
+        } catch {
+            console.error('Vehicle creation failed');
         }
     };
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent card click
-        if (confirm('A jeni i sigurt që doni të fshini këtë mjet?')) {
-            await deleteDoc(doc(db, 'vehicles', id));
+        if (!user) return;
+
+        if (confirm('Delete this vehicle and all linked services, expenses, documents, reminders, and private files?')) {
+            try {
+                setDeleteError('');
+                await callR2DocumentFunction(user, 'deleteVehicleCascade', { vehicleId: id });
+            } catch {
+                setDeleteError('Vehicle deletion failed. Please try again.');
+            }
         }
     };
 
-    const activeVehicles = vehicles.length;
-    const monthlySpend = "€0"; // Placeholder
+    const allExpenses = vehicles.flatMap((vehicle) => expensesByVehicle[vehicle.id] || []);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextThirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const monthlySpend = allExpenses
+        .filter((expense) => expense.date?.toDate && expense.date.toDate() >= monthStart)
+        .reduce((total, expense) => total + (expense.amount || 0), 0);
+    const totalSpend = allExpenses.reduce((total, expense) => total + (expense.amount || 0), 0);
+    const linkedSpend = allExpenses
+        .filter((expense) => expense.sourceType && expense.sourceType !== 'manual')
+        .reduce((total, expense) => total + (expense.amount || 0), 0);
+    const dueSoon = reminders.filter((reminder) => {
+        const dueDate = reminder.dueDate?.toDate();
+        return dueDate && dueDate <= nextThirtyDays;
+    });
+    const recentExpenses = allExpenses
+        .filter((expense) => expense.date?.toDate)
+        .sort((a, b) => b.date.toDate().getTime() - a.date.toDate().getTime())
+        .slice(0, 5);
+
+    const getVehicleName = (vehicleId: string) => {
+        const vehicle = vehicles.find((item) => item.id === vehicleId);
+        return vehicle ? `${vehicle.make} ${vehicle.model}` : 'Vehicle';
+    };
 
     return (
         <Layout>
             <div className="space-y-8">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
                         <p className="text-muted-foreground mt-1">
-                            Overview of your fleet status and upcoming alerts.
+                            Fleet costs, documents, service history, and upcoming reminders.
                         </p>
                     </div>
-                    <Button onClick={() => setShowAddForm(!showAddForm)} size="lg" className="shadow-lg shadow-primary/20">
+                    <Button onClick={() => setShowAddForm(!showAddForm)} size="lg" className="shadow-lg shadow-primary/20 w-full sm:w-auto">
                         <Plus className="w-5 h-5 mr-2" />
                         {t('SHTO MJET')}
                     </Button>
                 </div>
+                {deleteError && (
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                        {deleteError}
+                    </div>
+                )}
 
-                {/* Stats Overview */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatCard icon={CarIcon} label="Total Vehicles" value={activeVehicles.toString()} color="bg-blue-600" />
-                    <StatCard icon={Wrench} label="Pending Services" value="0" color="bg-amber-500" />
-                    <StatCard icon={DollarSign} label="Monthly Expenses" value={monthlySpend} color="bg-emerald-600" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <StatCard icon={CarIcon} label="Vehicles" value={vehicles.length.toString()} color="bg-blue-600" detail="Registered in your garage" />
+                    <StatCard icon={DollarSign} label="This Month" value={formatCurrency(monthlySpend)} color="bg-emerald-600" detail="All logged costs" />
+                    <StatCard icon={Receipt} label="Total Tracked" value={formatCurrency(totalSpend)} color="bg-indigo-600" detail={`${formatCurrency(linkedSpend)} from linked records`} />
+                    <StatCard icon={Bell} label="Due Soon" value={dueSoon.length.toString()} color="bg-amber-500" detail="Next 30 days" />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card className="p-5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-bold text-lg">Recent Costs</h2>
+                            <Receipt className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        {recentExpenses.length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-6">No expenses logged yet.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {recentExpenses.map((expense) => (
+                                    <div key={expense.id} className="flex items-center justify-between gap-3 rounded-lg bg-accent/40 p-3">
+                                        <div className="min-w-0">
+                                            <p className="font-medium truncate">{expense.category}</p>
+                                            <p className="text-xs text-muted-foreground truncate">
+                                                {getVehicleName(expense.vehicleId)}
+                                                {expense.sourceType && expense.sourceType !== 'manual' ? ` - linked ${expense.sourceType}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <p className="font-bold font-mono">{formatCurrency(expense.amount || 0)}</p>
+                                            <p className="text-xs text-muted-foreground">{expense.date?.toDate?.().toLocaleDateString()}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
+
+                    <Card className="p-5">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-bold text-lg">Upcoming Deadlines</h2>
+                            <Clock className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        {reminders.length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-6">No active reminders.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {reminders.slice(0, 5).map((reminder) => (
+                                    <div key={reminder.id} className="flex items-center justify-between gap-3 rounded-lg bg-accent/40 p-3">
+                                        <div className="min-w-0">
+                                            <p className="font-medium truncate">{reminder.title}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{getVehicleName(reminder.vehicleId)}</p>
+                                        </div>
+                                        <p className="text-sm font-medium shrink-0">{reminder.dueDate?.toDate?.().toLocaleDateString()}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
                 </div>
 
                 {showAddForm && (

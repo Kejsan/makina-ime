@@ -21,21 +21,50 @@ service cloud.firestore {
         || request.resource.data.userId == resource.data.userId;
     }
 
+    function hasOnly(keys) {
+      return request.resource.data.keys().hasOnly(keys);
+    }
+
+    function validLinkedSourceCreate() {
+      return request.resource.data.sourceType in ['manual', 'service'];
+    }
+
+    function canDeleteClientExpense() {
+      return !('sourceType' in resource.data)
+        || resource.data.sourceType == 'manual'
+        || resource.data.sourceType == 'service';
+    }
+
     match /vehicles/{vehicleId} {
       allow create: if isOwner(request.resource.data.userId);
-      allow read, delete: if isOwner(resource.data.userId);
+      allow read: if isOwner(resource.data.userId);
+      allow delete: if false;
       allow update: if isOwner(resource.data.userId) && vehicleOwnerUnchanged();
 
       match /services/{serviceId} {
-        allow read, create, update, delete: if ownsVehicle(vehicleId);
+        allow read, delete: if ownsVehicle(vehicleId);
+        allow create: if ownsVehicle(vehicleId)
+          && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid);
+        allow update: if ownsVehicle(vehicleId)
+          && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid);
       }
 
       match /expenses/{expenseId} {
-        allow read, create, update, delete: if ownsVehicle(vehicleId);
+        allow read: if ownsVehicle(vehicleId);
+        allow delete: if ownsVehicle(vehicleId) && canDeleteClientExpense();
+        allow create: if ownsVehicle(vehicleId)
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.vehicleId == vehicleId
+          && validLinkedSourceCreate()
+          && hasOnly(['userId', 'vehicleId', 'category', 'amount', 'date', 'notes', 'sourceType', 'sourceId', 'sourceLabel', 'createdAt']);
+        allow update: if false;
       }
 
       match /documents/{documentId} {
-        allow read, create, update, delete: if ownsVehicle(vehicleId);
+        allow read: if ownsVehicle(vehicleId);
+        allow delete: if ownsVehicle(vehicleId)
+          && (!('storageProvider' in resource.data) || resource.data.storageProvider != 'r2');
+        allow create, update: if false;
       }
     }
 
@@ -56,6 +85,18 @@ service cloud.firestore {
         allow read, update, delete: if isOwner(userId);
         allow create: if isOwner(userId);
       }
+    }
+
+    match /accountDeletionRequests/{requestId} {
+      allow create: if isOwner(request.resource.data.userId)
+        && request.resource.data.status == 'requested'
+        && hasOnly(['userId', 'email', 'status', 'createdAt']);
+      allow read: if isOwner(resource.data.userId);
+      allow update, delete: if false;
+    }
+
+    match /rateLimits/{rateLimitId} {
+      allow read, write: if false;
     }
   }
 }
