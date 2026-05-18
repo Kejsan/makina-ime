@@ -1,4 +1,5 @@
-import * as functions from "firebase-functions";
+import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import { sendEmail } from "./utils/email";
 
@@ -8,7 +9,7 @@ admin.initializeApp();
  * Scheduled function that runs every day at 9:00 AM.
  * Checks for reminders due within their 'leadTime' and sends notifications.
  */
-export const checkReminders = functions.pubsub.schedule("every day 09:00").onRun(async () => {
+export const checkReminders = onSchedule("every day 09:00", async () => {
     const db = admin.firestore();
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -91,9 +92,9 @@ export const checkReminders = functions.pubsub.schedule("every day 09:00").onRun
 /**
  * Trigger: When a new reminder is created, validate it.
  */
-export const onReminderCreate = functions.firestore.document('reminders/{reminderId}')
-    .onCreate((snap) => {
-      const newValue = snap.data();
+export const onReminderCreate = onDocumentCreated("reminders/{reminderId}", (event) => {
+      const newValue = event.data?.data();
+      if (!newValue) return null;
       console.log('New reminder created:', newValue.title);
       return null;
     });

@@ -5,24 +5,38 @@ import { db } from '../lib/firebase';
 import { Layout } from '../components/ui/Layout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { ArrowLeft, Car, Wrench, DollarSign, FileText, Calendar } from 'lucide-react';
+import { ArrowLeft, Car, Wrench, DollarSign, FileText, Calendar, Bell, Gauge } from 'lucide-react';
 import { ServiceLog } from '../components/ServiceLog';
 import { ExpenseTracker } from '../components/ExpenseTracker';
 import { DocumentManager } from '../components/DocumentManager';
 import { ReminderManager } from '../components/ReminderManager';
+import type { Timestamp } from 'firebase/firestore';
+
+interface VehicleDetailsData {
+    id: string;
+    make: string;
+    model: string;
+    year: number;
+    plateNumber?: string;
+    vin?: string;
+    currentMileage?: number;
+    registrationExpiry?: Timestamp | null;
+}
+
+type VehicleTab = 'overview' | 'services' | 'expenses' | 'documents' | 'reminders';
 
 export const VehicleDetails = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const [vehicle, setVehicle] = useState<any>(null);
+    const [vehicle, setVehicle] = useState<VehicleDetailsData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'expenses' | 'documents' | 'reminders'>('overview');
+    const [activeTab, setActiveTab] = useState<VehicleTab>('overview');
 
     useEffect(() => {
         if (!id) return;
         const unsubscribe = onSnapshot(doc(db, 'vehicles', id), (doc) => {
             if (doc.exists()) {
-                setVehicle({ id: doc.id, ...doc.data() });
+                setVehicle({ id: doc.id, ...doc.data() } as VehicleDetailsData);
             } else {
                 navigate('/');
             }
@@ -77,10 +91,11 @@ export const VehicleDetails = () => {
                             { id: 'services', label: 'Service Log', icon: Wrench },
                             { id: 'expenses', label: 'Expenses', icon: DollarSign },
                             { id: 'documents', label: 'Documents', icon: FileText },
+                            { id: 'reminders', label: 'Reminders', icon: Bell },
                         ].map((tab) => (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
+                                onClick={() => setActiveTab(tab.id as VehicleTab)}
                                 className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                                     activeTab === tab.id
                                         ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
@@ -114,6 +129,21 @@ export const VehicleDetails = () => {
                                     <div className="flex justify-between py-3 border-b border-dashed border-border/50">
                                         <span className="text-muted-foreground">Year</span>
                                         <span className="font-medium text-lg">{vehicle.year}</span>
+                                    </div>
+                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50 gap-4">
+                                        <span className="text-muted-foreground">Plate</span>
+                                        <span className="font-medium text-lg text-right">{vehicle.plateNumber || 'N/A'}</span>
+                                    </div>
+                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50 gap-4">
+                                        <span className="text-muted-foreground">VIN</span>
+                                        <span className="font-medium text-sm text-right break-all">{vehicle.vin || 'N/A'}</span>
+                                    </div>
+                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50">
+                                        <span className="text-muted-foreground">Mileage</span>
+                                        <span className="font-medium text-lg flex items-center gap-2">
+                                            <Gauge className="w-4 h-4 text-muted-foreground" />
+                                            {vehicle.currentMileage ? `${vehicle.currentMileage.toLocaleString()} km` : 'N/A'}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between py-3 border-b border-dashed border-border/50">
                                         <span className="text-muted-foreground">Registration Expiry</span>

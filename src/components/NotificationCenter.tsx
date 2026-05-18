@@ -15,6 +15,9 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [loading, setLoading] = useState(true);
+    const [notificationPermission, setNotificationPermission] = useState(
+        'Notification' in window ? Notification.permission : 'denied'
+    );
 
     useEffect(() => {
         if (!user) return;
@@ -69,6 +72,12 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
         }
     };
 
+    const enableBrowserNotifications = async () => {
+        if (!('Notification' in window)) return;
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+    };
+
     return (
         <div className="absolute right-0 mt-2 w-80 md:w-96 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-4 border-b border-border flex justify-between items-center bg-accent/5">
@@ -90,6 +99,16 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
             </div>
 
             <div className="max-h-[400px] overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                {notificationPermission === 'default' && (
+                    <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                        <p className="text-sm font-medium text-foreground">Browser alerts are off</p>
+                        <p className="text-xs text-muted-foreground mt-1">Enable them for PWA reminders on this device.</p>
+                        <Button size="sm" className="mt-3 w-full" onClick={enableBrowserNotifications}>
+                            Enable Browser Alerts
+                        </Button>
+                    </div>
+                )}
+
                 {loading ? (
                     <div className="flex justify-center py-8">
                         <Loader2 className="w-6 h-6 animate-spin text-primary" />

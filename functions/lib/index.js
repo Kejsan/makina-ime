@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.onReminderCreate = exports.checkReminders = void 0;
-const functions = require("firebase-functions");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
+const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 const email_1 = require("./utils/email");
 admin.initializeApp();
@@ -9,7 +10,7 @@ admin.initializeApp();
  * Scheduled function that runs every day at 9:00 AM.
  * Checks for reminders due within their 'leadTime' and sends notifications.
  */
-exports.checkReminders = functions.pubsub.schedule("every day 09:00").onRun(async () => {
+exports.checkReminders = (0, scheduler_1.onSchedule)("every day 09:00", async () => {
     const db = admin.firestore();
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -83,9 +84,11 @@ exports.checkReminders = functions.pubsub.schedule("every day 09:00").onRun(asyn
 /**
  * Trigger: When a new reminder is created, validate it.
  */
-exports.onReminderCreate = functions.firestore.document('reminders/{reminderId}')
-    .onCreate((snap) => {
-    const newValue = snap.data();
+exports.onReminderCreate = (0, firestore_1.onDocumentCreated)("reminders/{reminderId}", (event) => {
+    var _a;
+    const newValue = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+    if (!newValue)
+        return null;
     console.log('New reminder created:', newValue.title);
     return null;
 });

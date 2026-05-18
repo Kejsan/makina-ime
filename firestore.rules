@@ -2,9 +2,60 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write if the user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function ownsVehicle(vehicleId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/vehicles/$(vehicleId))
+        && get(/databases/$(database)/documents/vehicles/$(vehicleId)).data.userId == request.auth.uid;
+    }
+
+    function vehicleOwnerUnchanged() {
+      return !('userId' in request.resource.data)
+        || request.resource.data.userId == resource.data.userId;
+    }
+
     match /vehicles/{vehicleId} {
-      allow read, write: if request.auth != null;
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, delete: if isOwner(resource.data.userId);
+      allow update: if isOwner(resource.data.userId) && vehicleOwnerUnchanged();
+
+      match /services/{serviceId} {
+        allow read, create, update, delete: if ownsVehicle(vehicleId);
+      }
+
+      match /expenses/{expenseId} {
+        allow read, create, update, delete: if ownsVehicle(vehicleId);
+      }
+
+      match /documents/{documentId} {
+        allow read, create, update, delete: if ownsVehicle(vehicleId);
+      }
+    }
+
+    match /reminders/{reminderId} {
+      allow create: if isOwner(request.resource.data.userId)
+        && ownsVehicle(request.resource.data.vehicleId);
+      allow read, delete: if isOwner(resource.data.userId);
+      allow update: if isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.vehicleId == resource.data.vehicleId;
+    }
+
+    match /users/{userId} {
+      allow create: if isOwner(userId);
+      allow read, update, delete: if isOwner(userId);
+
+      match /notifications/{notificationId} {
+        allow read, update, delete: if isOwner(userId);
+        allow create: if isOwner(userId);
+      }
     }
   }
 }

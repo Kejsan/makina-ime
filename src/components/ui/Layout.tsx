@@ -55,11 +55,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         if (!user) return;
 
-        // Request Browser Notification Permission
-        if (Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
-
         const q = query(
             collection(db, 'users', user.uid, 'notifications'),
             where('read', '==', false)
@@ -70,7 +65,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             
             // Show browser notification for newest one if it's new
             snapshot.docChanges().forEach((change) => {
-                if (change.type === "added" && Notification.permission === "granted") {
+                if (change.type === "added" && 'Notification' in window && Notification.permission === "granted") {
                     const data = change.doc.data();
                     new Notification(data.title, {
                         body: data.body,

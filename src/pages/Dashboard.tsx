@@ -15,10 +15,14 @@ interface Vehicle {
     make: string;
     model: string;
     year: number;
+    plateNumber?: string;
+    vin?: string;
+    vehicleType?: string;
+    currentMileage?: number;
     registrationExpiry?: Timestamp;
 }
 
-const StatCard = ({ icon: Icon, label, value, color }: { icon: any, label: string, value: string, color: string }) => (
+const StatCard = ({ icon: Icon, label, value, color }: { icon: React.ElementType, label: string, value: string, color: string }) => (
     <Card className="p-6">
         <div className="flex items-center gap-4">
             <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center`}>
@@ -44,6 +48,10 @@ export const Dashboard = () => {
     const [make, setMake] = useState('');
     const [model, setModel] = useState('');
     const [year, setYear] = useState('');
+    const [plateNumber, setPlateNumber] = useState('');
+    const [vin, setVin] = useState('');
+    const [vehicleType, setVehicleType] = useState('car');
+    const [currentMileage, setCurrentMileage] = useState('');
     const [expiry, setExpiry] = useState('');
 
     useEffect(() => {
@@ -69,9 +77,13 @@ export const Dashboard = () => {
         try {
             await addDoc(collection(db, 'vehicles'), {
                 userId: user.uid,
-                make,
-                model,
+                make: make.trim(),
+                model: model.trim(),
                 year: parseInt(year),
+                plateNumber: plateNumber.trim().toUpperCase(),
+                vin: vin.trim().toUpperCase(),
+                vehicleType,
+                currentMileage: currentMileage ? parseInt(currentMileage) : 0,
                 registrationExpiry: expiry ? Timestamp.fromDate(new Date(expiry)) : null,
                 createdAt: Timestamp.now()
             });
@@ -79,6 +91,10 @@ export const Dashboard = () => {
             setMake('');
             setModel('');
             setYear('');
+            setPlateNumber('');
+            setVin('');
+            setVehicleType('car');
+            setCurrentMileage('');
             setExpiry('');
         } catch (error) {
             console.error("Error adding vehicle: ", error);
@@ -126,7 +142,7 @@ export const Dashboard = () => {
                                 Add New Vehicle
                             </h2>
                             <form onSubmit={handleAddVehicle} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Make</label>
                                         <Input
@@ -146,7 +162,7 @@ export const Dashboard = () => {
                                         />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Year</label>
                                         <Input
@@ -158,6 +174,49 @@ export const Dashboard = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
+                                        <label className="text-sm font-medium">Plate Number</label>
+                                        <Input
+                                            placeholder="AB 123 CD"
+                                            value={plateNumber}
+                                            onChange={(e) => setPlateNumber(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Vehicle Type</label>
+                                        <select
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                            value={vehicleType}
+                                            onChange={(e) => setVehicleType(e.target.value)}
+                                        >
+                                            <option value="car">Car</option>
+                                            <option value="suv">SUV</option>
+                                            <option value="motorcycle">Motorcycle</option>
+                                            <option value="truck">Truck</option>
+                                            <option value="van">Van</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Current Mileage (km)</label>
+                                        <Input
+                                            type="number"
+                                            placeholder="120000"
+                                            value={currentMileage}
+                                            onChange={(e) => setCurrentMileage(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">VIN</label>
+                                        <Input
+                                            placeholder="Vehicle identification number"
+                                            value={vin}
+                                            onChange={(e) => setVin(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
                                         <label className="text-sm font-medium">Insurance Expiry</label>
                                         <Input
                                             type="date"
@@ -166,7 +225,7 @@ export const Dashboard = () => {
                                         />
                                     </div>
                                 </div>
-                                <div className="flex gap-2 pt-4">
+                                <div className="flex flex-col sm:flex-row gap-2 pt-4">
                                     <Button type="submit" className="flex-1">Save Vehicle</Button>
                                     <Button type="button" variant="ghost" onClick={() => setShowAddForm(false)}>Cancel</Button>
                                 </div>
@@ -215,7 +274,7 @@ export const Dashboard = () => {
                                     <h3 className="text-xl font-bold mb-1">{vehicle.make} {vehicle.model}</h3>
                                     <p className="text-muted-foreground text-sm flex items-center gap-2">
                                         <Calendar className="w-3 h-3" />
-                                        {vehicle.year}
+                                        {vehicle.year}{vehicle.plateNumber ? ` - ${vehicle.plateNumber}` : ''}
                                     </p>
 
                                     <div className="space-y-3 pt-6 mt-4 border-t border-border/50">

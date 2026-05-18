@@ -11,7 +11,7 @@ export interface Vehicle {
 
 export interface ServiceRecord {
     id: string;
-    date: string;
+    date: Timestamp;
     description: string;
     cost: number;
     mileage: number;
@@ -22,8 +22,8 @@ export interface ExpenseRecord {
     id: string;
     category: string; // 'fuel' | 'insurance' | 'tax' | 'maintenance' | 'other'
     amount: number;
-    date: string;
-    note?: string;
+    date: Timestamp;
+    notes?: string;
     vehicleId: string;
 }
 
@@ -33,6 +33,7 @@ export interface Document {
     url: string;
     type: string; // 'insurance' | 'inspection' | 'tax' | 'other'
     uploadedAt: Timestamp;
+    issueDate?: string | null;
     expiryDate?: string | null;
     vehicleId: string;
     path: string; // Storage path reference

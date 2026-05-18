@@ -2,18 +2,35 @@ import { useState, useEffect } from 'react';
 import { Upload, FileText, Trash2, Download, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { Input } from './ui/Input';
 import { db, storage } from '../lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useParams } from 'react-router-dom';
 import type { Document } from '../lib/types';
+import { useAuth } from '../context/AuthContext';
 
 export const DocumentManager = () => {
     const { id: vehicleId } = useParams<{ id: string }>();
+    const { user } = useAuth();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
+    const [documentType, setDocumentType] = useState('insurance');
+    const [issueDate, setIssueDate] = useState('');
+    const [expiryDate, setExpiryDate] = useState('');
+
+    const documentTypes = [
+        { value: 'insurance', label: 'Insurance / TPL' },
+        { value: 'registration', label: 'Registration Certificate' },
+        { value: 'inspection', label: 'Technical Inspection' },
+        { value: 'tax', label: 'Road Tax' },
+        { value: 'service', label: 'Service Invoice' },
+        { value: 'ownership', label: 'Ownership / Title' },
+        { value: 'warranty', label: 'Warranty' },
+        { value: 'other', label: 'Other' }
+    ];
 
     useEffect(() => {
         if (!vehicleId) return;
@@ -41,7 +58,7 @@ export const DocumentManager = () => {
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file || !vehicleId) return;
+        if (!file || !vehicleId || !user) return;
 
         // Max size 5MB
         if (file.size > 5 * 1024 * 1024) {
@@ -64,11 +81,30 @@ export const DocumentManager = () => {
                 name: file.name,
                 url: downloadURL,
                 path: storagePath,
-                type: 'other', // Default type
+                type: documentType,
                 uploadedAt: serverTimestamp(),
                 vehicleId,
-                expiryDate: null 
+                issueDate: issueDate || null,
+                expiryDate: expiryDate || null
             });
+
+            if (expiryDate) {
+                const typeLabel = documentTypes.find((type) => type.value === documentType)?.label || 'Document';
+                await addDoc(collection(db, 'reminders'), {
+                    userId: user.uid,
+                    vehicleId,
+                    title: `${typeLabel} renewal`,
+                    type: documentType,
+                    dueDate: Timestamp.fromDate(new Date(expiryDate)),
+                    leadTimeDays: 14,
+                    recurrence: documentType === 'insurance' || documentType === 'tax' ? 'yearly' : 'none',
+                    completed: false,
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            setIssueDate('');
+            setExpiryDate('');
 
         } catch (err: unknown) {
             console.error(err);
@@ -101,7 +137,18 @@ export const DocumentManager = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-foreground">Vehicle Documents</h3>
-                <div className="relative">
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <select
+                        className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={documentType}
+                        onChange={(event) => setDocumentType(event.target.value)}
+                        disabled={uploading}
+                    >
+                        {documentTypes.map((type) => (
+                            <option key={type.value} value={type.value}>{type.label}</option>
+                        ))}
+                    </select>
+                    <div className="relative">
                     <input
                         type="file"
                         id="file-upload"
@@ -121,8 +168,31 @@ export const DocumentManager = () => {
                             Upload Document
                         </Button>
                     </label>
+                    </div>
                 </div>
             </div>
+
+            <Card className="p-4 bg-surface/40">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                        type="date"
+                        label="Issue Date"
+                        value={issueDate}
+                        onChange={(event) => setIssueDate(event.target.value)}
+                        disabled={uploading}
+                    />
+                    <Input
+                        type="date"
+                        label="Expiry Date"
+                        value={expiryDate}
+                        onChange={(event) => setExpiryDate(event.target.value)}
+                        disabled={uploading}
+                    />
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                    Adding an expiry date creates a renewal reminder automatically.
+                </p>
+            </Card>
 
             {error && (
                 <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-center text-sm">
@@ -156,7 +226,7 @@ export const DocumentManager = () => {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                 <a 
                                     href={doc.url} 
                                     target="_blank" 

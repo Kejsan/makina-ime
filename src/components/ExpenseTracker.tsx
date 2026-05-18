@@ -5,9 +5,10 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Card } from './ui/Card';
 import { DollarSign, Calendar, Trash2, Plus, Tag } from 'lucide-react';
+import type { ExpenseRecord } from '../lib/types';
 
 export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
-    const [expenses, setExpenses] = useState<any[]>([]);
+    const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     
@@ -25,7 +26,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
             orderBy('date', 'desc')
         );
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseRecord)));
             setLoading(false);
         });
         return unsubscribe;
@@ -154,7 +155,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                                             </span>
                                             {expense.notes && (
                                                 <span className="truncate max-w-[150px] opacity-75">
-                                                    • {expense.notes}
+                                                    - {expense.notes}
                                                 </span>
                                             )}
                                         </div>
@@ -164,7 +165,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                                     <span className="font-bold text-lg font-mono">€{expense.amount.toFixed(2)}</span>
                                     <button 
                                         onClick={() => handleDelete(expense.id)} 
-                                        className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"
+                                        className="text-muted-foreground hover:text-destructive transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"
                                         title="Delete Expense"
                                     >
                                         <Trash2 className="w-4 h-4" />

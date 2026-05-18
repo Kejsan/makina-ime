@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { type User, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { db } from '../lib/firebase';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
     user: User | null;
@@ -13,6 +15,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const useAuth = () => useContext(AuthContext);
+
+const upsertUserProfile = async (user: User, includeCreatedAt = false) => {
+    await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        updatedAt: serverTimestamp(),
+        ...(includeCreatedAt ? { createdAt: serverTimestamp() } : {})
+    }, { merge: true });
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -27,11 +37,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, []);
 
     const signIn = async (email: string, password: string) => {
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        await upsertUserProfile(credential.user);
     };
 
     const signUp = async (email: string, password: string) => {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        await upsertUserProfile(credential.user, true);
     };
 
     const signOut = () => firebaseSignOut(auth);

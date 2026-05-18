@@ -95,7 +95,7 @@ export const ReminderManager = () => {
         }
     };
 
-    const getDaysRemaining = (timestamp: any) => {
+    const getDaysRemaining = (timestamp?: Timestamp) => {
         if (!timestamp) return 0;
         const due = timestamp.toDate();
         const now = new Date();

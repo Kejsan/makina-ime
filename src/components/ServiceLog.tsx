@@ -5,9 +5,10 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Card } from './ui/Card';
 import { Wrench, Calendar, Trash2, Plus, Gauge } from 'lucide-react';
+import type { ServiceRecord } from '../lib/types';
 
 export const ServiceLog = ({ vehicleId }: { vehicleId: string }) => {
-    const [services, setServices] = useState<any[]>([]);
+    const [services, setServices] = useState<ServiceRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     
@@ -23,7 +24,7 @@ export const ServiceLog = ({ vehicleId }: { vehicleId: string }) => {
             orderBy('date', 'desc')
         );
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceRecord)));
             setLoading(false);
         });
         return unsubscribe;
@@ -143,7 +144,7 @@ export const ServiceLog = ({ vehicleId }: { vehicleId: string }) => {
                                     <span className="font-bold text-xl font-mono">€{service.cost.toFixed(2)}</span>
                                     <button 
                                         onClick={() => handleDelete(service.id)} 
-                                        className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"
+                                        className="text-muted-foreground hover:text-destructive transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"
                                         title="Delete Record"
                                     >
                                         <Trash2 className="w-4 h-4" />
