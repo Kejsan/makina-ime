@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import type React from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
+import type { Timestamp } from 'firebase/firestore';
+import { ArrowLeft, Bell, Calendar, Car, DollarSign, FileText, Gauge, Wrench } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { Layout } from '../components/ui/Layout';
 import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { ArrowLeft, Car, Wrench, DollarSign, FileText, Calendar, Bell, Gauge } from 'lucide-react';
+import { AppSurface, PageHeader, Panel, StatusPill } from '../components/ui/design-system';
 import { ServiceLog } from '../components/ServiceLog';
 import { ExpenseTracker } from '../components/ExpenseTracker';
 import { DocumentManager } from '../components/DocumentManager';
 import { ReminderManager } from '../components/ReminderManager';
-import type { Timestamp } from 'firebase/firestore';
 
 interface VehicleDetailsData {
     id: string;
@@ -25,6 +26,14 @@ interface VehicleDetailsData {
 
 type VehicleTab = 'overview' | 'services' | 'expenses' | 'documents' | 'reminders';
 
+const tabs: { id: VehicleTab; label: string; icon: React.ElementType }[] = [
+    { id: 'overview', label: 'Overview', icon: Car },
+    { id: 'services', label: 'Services', icon: Wrench },
+    { id: 'expenses', label: 'Expenses', icon: DollarSign },
+    { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'reminders', label: 'Reminders', icon: Bell },
+];
+
 export const VehicleDetails = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -34,11 +43,11 @@ export const VehicleDetails = () => {
 
     useEffect(() => {
         if (!id) return;
-        const unsubscribe = onSnapshot(doc(db, 'vehicles', id), (doc) => {
-            if (doc.exists()) {
-                setVehicle({ id: doc.id, ...doc.data() } as VehicleDetailsData);
+        const unsubscribe = onSnapshot(doc(db, 'vehicles', id), (snapshot) => {
+            if (snapshot.exists()) {
+                setVehicle({ id: snapshot.id, ...snapshot.data() } as VehicleDetailsData);
             } else {
-                navigate('/');
+                navigate('/app');
             }
             setLoading(false);
         });
@@ -48,8 +57,8 @@ export const VehicleDetails = () => {
     if (loading) {
         return (
             <Layout>
-                <div className="flex justify-center items-center h-[50vh]">
-                     <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                <div className="flex h-[50vh] items-center justify-center">
+                    <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 </div>
             </Layout>
         );
@@ -60,119 +69,98 @@ export const VehicleDetails = () => {
     return (
         <Layout>
             <div className="space-y-6">
-                <Button variant="ghost" onClick={() => navigate('/')} className="pl-0 hover:bg-transparent -ml-2 text-muted-foreground hover:text-foreground group">
-                    <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-                    Back to Dashboard
+                <Button variant="ghost" onClick={() => navigate('/app')} className="pl-0 text-muted-foreground hover:bg-transparent hover:text-foreground">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to dashboard
                 </Button>
 
-                <div className="flex flex-col md:flex-row justify-between items-start gap-4 animate-in slide-in-from-left-2 duration-300">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">
-                            {vehicle.make} {vehicle.model}
-                        </h1>
-                        <p className="text-muted-foreground flex items-center gap-3 mt-2 text-lg">
-                            <span className="flex items-center gap-1.5 bg-surface px-2 py-1 rounded-md border border-border/50 text-sm">
-                                <Calendar className="w-3.5 h-3.5" />
+                <PageHeader
+                    eyebrow="Vehicle workspace"
+                    title={`${vehicle.make} ${vehicle.model}`}
+                    description="Documents, services, expenses, and reminders for this vehicle."
+                    actions={
+                        <div className="flex flex-wrap gap-2">
+                            <StatusPill tone="blue">
+                                <Calendar className="h-3.5 w-3.5" />
                                 {vehicle.year}
-                            </span>
-                            <span className="flex items-center gap-1.5 bg-surface px-2 py-1 rounded-md border border-border/50 text-sm">
-                                <Car className="w-3.5 h-3.5" />
-                                {vehicle.plateNumber || 'No Plate'}
-                            </span>
-                        </p>
-                    </div>
-                    {/* Add edit/delete actions here later */}
-                </div>
+                            </StatusPill>
+                            <StatusPill tone="amber">
+                                <Car className="h-3.5 w-3.5" />
+                                {vehicle.plateNumber || 'No plate'}
+                            </StatusPill>
+                        </div>
+                    }
+                />
 
-                <div className="sticky top-20 z-10 bg-background/80 backdrop-blur-md py-2 border-b border-border/50 -mx-4 px-4 md:mx-0 md:px-0 md:bg-transparent md:backdrop-blur-none md:border-none md:static">
-                    <div className="flex space-x-1 bg-surface/50 p-1 rounded-xl w-full md:w-fit overflow-x-auto no-scrollbar border border-white/5">
-                        {[
-                            { id: 'overview', label: 'Overview', icon: Car },
-                            { id: 'services', label: 'Service Log', icon: Wrench },
-                            { id: 'expenses', label: 'Expenses', icon: DollarSign },
-                            { id: 'documents', label: 'Documents', icon: FileText },
-                            { id: 'reminders', label: 'Reminders', icon: Bell },
-                        ].map((tab) => (
+                <div className="sticky top-16 z-20 -mx-4 border-y border-border/80 bg-background/95 px-4 py-3 backdrop-blur-xl md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
+                    <div className="flex gap-2 overflow-x-auto">
+                        {tabs.map((tab) => (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id as VehicleTab)}
-                                className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
                                     activeTab === tab.id
-                                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                                        : 'border border-border bg-card/60 text-muted-foreground hover:text-foreground'
                                 }`}
                             >
-                                <tab.icon className="w-4 h-4 mr-2" />
+                                <tab.icon className="h-4 w-4" />
                                 {tab.label}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                <div className="animate-in fade-in zoom-in-95 duration-200 min-h-[400px]">
-                    {activeTab === 'overview' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card className="p-8 border-primary/10 bg-gradient-to-br from-surface to-surface/50">
-                                <h3 className="text-xl font-bold mb-6 flex items-center">
-                                    <Car className="w-5 h-5 mr-3 text-primary" />
-                                    Vehicle Information
-                                </h3>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50">
-                                        <span className="text-muted-foreground">Make</span>
-                                        <span className="font-medium text-lg">{vehicle.make}</span>
-                                    </div>
-                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50">
-                                        <span className="text-muted-foreground">Model</span>
-                                        <span className="font-medium text-lg">{vehicle.model}</span>
-                                    </div>
-                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50">
-                                        <span className="text-muted-foreground">Year</span>
-                                        <span className="font-medium text-lg">{vehicle.year}</span>
-                                    </div>
-                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50 gap-4">
-                                        <span className="text-muted-foreground">Plate</span>
-                                        <span className="font-medium text-lg text-right">{vehicle.plateNumber || 'N/A'}</span>
-                                    </div>
-                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50 gap-4">
-                                        <span className="text-muted-foreground">VIN</span>
-                                        <span className="font-medium text-sm text-right break-all">{vehicle.vin || 'N/A'}</span>
-                                    </div>
-                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50">
-                                        <span className="text-muted-foreground">Mileage</span>
-                                        <span className="font-medium text-lg flex items-center gap-2">
-                                            <Gauge className="w-4 h-4 text-muted-foreground" />
-                                            {vehicle.currentMileage ? `${vehicle.currentMileage.toLocaleString()} km` : 'N/A'}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between py-3 border-b border-dashed border-border/50">
-                                        <span className="text-muted-foreground">Registration Expiry</span>
-                                        <span className={`font-medium text-lg ${!vehicle.registrationExpiry ? 'text-muted-foreground' : 'text-foreground'}`}>
-                                            {vehicle.registrationExpiry?.toDate().toLocaleDateString() || 'N/A'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </Card>
-                            <Card className="p-6 flex items-center justify-center border-dashed border-2 border-border/50 bg-transparent shadow-none group hover:border-primary/30 transition-colors">
-                                <div className="text-center text-muted-foreground group-hover:text-primary/70 transition-colors">
-                                    <div className="w-20 h-20 bg-surface rounded-full flex items-center justify-center mx-auto mb-4 border border-border group-hover:border-primary/30 group-hover:scale-110 transition-all duration-300">
-                                        <Car className="w-10 h-10 opacity-50" />
-                                    </div>
-                                    <p className="font-medium">Vehicle photo coming soon...</p>
-                                </div>
-                            </Card>
-                        </div>
-                    )}
+                {activeTab === 'overview' && (
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                        <AppSurface className="p-6">
+                            <h2 className="mb-5 text-lg font-bold">Vehicle information</h2>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                {[
+                                    ['Make', vehicle.make],
+                                    ['Model', vehicle.model],
+                                    ['Year', vehicle.year],
+                                    ['Plate', vehicle.plateNumber || 'N/A'],
+                                    ['VIN', vehicle.vin || 'N/A'],
+                                    ['Registration expiry', vehicle.registrationExpiry?.toDate().toLocaleDateString() || 'N/A'],
+                                ].map(([label, value]) => (
+                                    <Panel key={label} className="p-4">
+                                        <p className="mi-label">{label}</p>
+                                        <p className="mt-2 break-words font-semibold">{value}</p>
+                                    </Panel>
+                                ))}
+                            </div>
+                        </AppSurface>
 
-                    {activeTab === 'services' && <ServiceLog vehicleId={id!} />}
-                    {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} />}
-                    {activeTab === 'documents' && (
-                        <DocumentManager />
-                    )}
-                    {activeTab === 'reminders' && (
-                        <ReminderManager />
-                    )}
-                </div>
+                        <AppSurface className="p-6">
+                            <h2 className="mb-5 text-lg font-bold">Care status</h2>
+                            <div className="space-y-3">
+                                <Panel className="flex items-center justify-between gap-3 p-4">
+                                    <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Gauge className="h-4 w-4 text-primary" />
+                                        Mileage
+                                    </span>
+                                    <span className="font-mono font-bold">
+                                        {vehicle.currentMileage ? `${vehicle.currentMileage.toLocaleString()} km` : 'N/A'}
+                                    </span>
+                                </Panel>
+                                <Panel className="flex items-center justify-between gap-3 p-4">
+                                    <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Bell className="h-4 w-4 text-amber-400" />
+                                        Reminder status
+                                    </span>
+                                    <StatusPill tone="emerald">Active</StatusPill>
+                                </Panel>
+                            </div>
+                        </AppSurface>
+                    </div>
+                )}
+
+                {activeTab === 'services' && <ServiceLog vehicleId={id!} />}
+                {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} />}
+                {activeTab === 'documents' && <DocumentManager />}
+                {activeTab === 'reminders' && <ReminderManager />}
             </div>
         </Layout>
     );

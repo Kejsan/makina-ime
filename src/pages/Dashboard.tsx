@@ -1,14 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Plus, Car as CarIcon, AlertCircle, Trash2, Calendar, Bell, DollarSign, Receipt, Clock } from 'lucide-react';
-import { collection, query, where, onSnapshot, addDoc, Timestamp, orderBy } from 'firebase/firestore';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    Bell,
+    Calendar,
+    Car as CarIcon,
+    CreditCard,
+    DollarSign,
+    FileText,
+    Filter,
+    Plus,
+    ShieldAlert,
+    Trash2,
+    Wrench,
+    X,
+} from 'lucide-react';
+import { addDoc, collection, onSnapshot, orderBy, query, Timestamp, where } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Layout } from '../components/ui/Layout';
+import { AppSurface, EmptyState, MetricCard, PageHeader, Panel, StatusPill } from '../components/ui/design-system';
 import type { ExpenseRecord, Reminder } from '../lib/types';
 import { callR2DocumentFunction } from '../lib/r2Documents';
 
@@ -21,38 +33,32 @@ interface Vehicle {
     vin?: string;
     vehicleType?: string;
     currentMileage?: number;
-    registrationExpiry?: Timestamp;
+    registrationExpiry?: Timestamp | null;
 }
 
 const formatCurrency = (value: number) => `€${value.toFixed(2)}`;
 
-const StatCard = ({ icon: Icon, label, value, color, detail }: { icon: React.ElementType, label: string, value: string, color: string, detail?: string }) => (
-    <Card className="p-5">
-        <div className="flex items-center gap-4">
-            <div className={`w-11 h-11 rounded-lg ${color} flex items-center justify-center shrink-0`}>
-                <Icon className="w-5 h-5 text-white" />
-            </div>
-            <div className="min-w-0">
-                <p className="text-sm font-medium text-muted-foreground">{label}</p>
-                <h3 className="text-2xl font-bold tracking-tight">{value}</h3>
-                {detail && <p className="text-xs text-muted-foreground mt-1 truncate">{detail}</p>}
-            </div>
-        </div>
-    </Card>
-);
+const dateFromTimestamp = (value?: Timestamp | null) => value?.toDate?.() || null;
+
+const daysUntil = (date: Date) => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+    return Math.ceil((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+};
 
 export const Dashboard = () => {
-    const { t } = useTranslation();
     const { user } = useAuth();
     const navigate = useNavigate();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [expensesByVehicle, setExpensesByVehicle] = useState<Record<string, ExpenseRecord[]>>({});
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showAddForm, setShowAddForm] = useState(false);
+    const [selectedVehicleFilter, setSelectedVehicleFilter] = useState('all');
+    const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
     const [deleteError, setDeleteError] = useState('');
 
-    // Form State
     const [make, setMake] = useState('');
     const [model, setModel] = useState('');
     const [year, setYear] = useState('');
@@ -65,13 +71,9 @@ export const Dashboard = () => {
     useEffect(() => {
         if (!user) return;
 
-        const q = query(
-            collection(db, 'vehicles'),
-            where('userId', '==', user.uid)
-        );
-
+        const q = query(collection(db, 'vehicles'), where('userId', '==', user.uid));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setVehicles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vehicle)));
+            setVehicles(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Vehicle)));
             setLoading(false);
         });
 
@@ -84,18 +86,11 @@ export const Dashboard = () => {
         }
 
         const unsubscribes = vehicles.map((vehicle) => {
-            const q = query(
-                collection(db, 'vehicles', vehicle.id, 'expenses'),
-                orderBy('date', 'desc')
-            );
-
+            const q = query(collection(db, 'vehicles', vehicle.id, 'expenses'), orderBy('date', 'desc'));
             return onSnapshot(q, (snapshot) => {
                 setExpensesByVehicle((previous) => ({
                     ...previous,
-                    [vehicle.id]: snapshot.docs.map((doc) => ({
-                        id: doc.id,
-                        ...doc.data()
-                    } as ExpenseRecord))
+                    [vehicle.id]: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ExpenseRecord)),
                 }));
             });
         });
@@ -106,19 +101,9 @@ export const Dashboard = () => {
     useEffect(() => {
         if (!user) return;
 
-        const q = query(
-            collection(db, 'reminders'),
-            where('userId', '==', user.uid),
-            where('completed', '==', false)
-        );
-
+        const q = query(collection(db, 'reminders'), where('userId', '==', user.uid), where('completed', '==', false));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data()
-            } as Reminder));
-
-            setReminders(data.sort((a, b) => (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0)));
+            setReminders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Reminder)));
         });
 
         return unsubscribe;
@@ -139,9 +124,10 @@ export const Dashboard = () => {
                 vehicleType,
                 currentMileage: currentMileage ? parseInt(currentMileage) : 0,
                 registrationExpiry: expiry ? Timestamp.fromDate(new Date(expiry)) : null,
-                createdAt: Timestamp.now()
+                createdAt: Timestamp.now(),
             });
-            setShowAddForm(false);
+
+            setIsVehicleModalOpen(false);
             setMake('');
             setModel('');
             setYear('');
@@ -155,24 +141,28 @@ export const Dashboard = () => {
         }
     };
 
-    const handleDelete = async (id: string, e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent card click
+    const handleDelete = async (vehicleId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
         if (!user) return;
 
         if (confirm('Delete this vehicle and all linked services, expenses, documents, reminders, and private files?')) {
             try {
                 setDeleteError('');
-                await callR2DocumentFunction(user, 'deleteVehicleCascade', { vehicleId: id });
+                await callR2DocumentFunction(user, 'deleteVehicleCascade', { vehicleId });
+                if (selectedVehicleFilter === vehicleId) setSelectedVehicleFilter('all');
             } catch {
                 setDeleteError('Vehicle deletion failed. Please try again.');
             }
         }
     };
 
-    const allExpenses = vehicles.flatMap((vehicle) => expensesByVehicle[vehicle.id] || []);
+    const allExpenses = useMemo(() => vehicles.flatMap((vehicle) => expensesByVehicle[vehicle.id] || []), [vehicles, expensesByVehicle]);
+    const filteredExpenses = selectedVehicleFilter === 'all'
+        ? allExpenses
+        : allExpenses.filter((expense) => expense.vehicleId === selectedVehicleFilter);
+
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const nextThirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const monthlySpend = allExpenses
         .filter((expense) => expense.date?.toDate && expense.date.toDate() >= monthStart)
         .reduce((total, expense) => total + (expense.amount || 0), 0);
@@ -180,270 +170,329 @@ export const Dashboard = () => {
     const linkedSpend = allExpenses
         .filter((expense) => expense.sourceType && expense.sourceType !== 'manual')
         .reduce((total, expense) => total + (expense.amount || 0), 0);
-    const dueSoon = reminders.filter((reminder) => {
-        const dueDate = reminder.dueDate?.toDate();
-        return dueDate && dueDate <= nextThirtyDays;
-    });
-    const recentExpenses = allExpenses
-        .filter((expense) => expense.date?.toDate)
-        .sort((a, b) => b.date.toDate().getTime() - a.date.toDate().getTime())
-        .slice(0, 5);
+
+    const upcomingDeadlines = useMemo(() => {
+        const registrationDeadlines = vehicles.flatMap((vehicle) => {
+            const expiryDate = dateFromTimestamp(vehicle.registrationExpiry);
+            if (!expiryDate) return [];
+            return [{
+                id: `${vehicle.id}-registration`,
+                vehicleId: vehicle.id,
+                vehicleName: `${vehicle.make} ${vehicle.model}`,
+                type: 'Registration / insurance',
+                date: expiryDate,
+                daysRemaining: daysUntil(expiryDate),
+                icon: ShieldAlert,
+            }];
+        });
+
+        const reminderDeadlines = reminders
+            .filter((reminder) => reminder.dueDate?.toDate)
+            .map((reminder) => ({
+                id: reminder.id,
+                vehicleId: reminder.vehicleId,
+                vehicleName: vehicles.find((vehicle) => vehicle.id === reminder.vehicleId)
+                    ? `${vehicles.find((vehicle) => vehicle.id === reminder.vehicleId)?.make} ${vehicles.find((vehicle) => vehicle.id === reminder.vehicleId)?.model}`
+                    : 'Vehicle',
+                type: reminder.title,
+                date: reminder.dueDate.toDate(),
+                daysRemaining: daysUntil(reminder.dueDate.toDate()),
+                icon: reminder.type === 'maintenance' ? Wrench : reminder.type === 'tax' ? FileText : Calendar,
+            }));
+
+        return [...registrationDeadlines, ...reminderDeadlines]
+            .sort((a, b) => a.daysRemaining - b.daysRemaining)
+            .slice(0, 8);
+    }, [reminders, vehicles]);
+
+    const dueSoonCount = upcomingDeadlines.filter((deadline) => deadline.daysRemaining >= 0 && deadline.daysRemaining <= 30).length;
 
     const getVehicleName = (vehicleId: string) => {
         const vehicle = vehicles.find((item) => item.id === vehicleId);
-        return vehicle ? `${vehicle.make} ${vehicle.model}` : 'Vehicle';
+        return vehicle ? `${vehicle.make} ${vehicle.model}` : 'Unknown vehicle';
     };
 
     return (
         <Layout>
-            <div className="space-y-8">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Fleet costs, documents, service history, and upcoming reminders.
-                        </p>
-                    </div>
-                    <Button onClick={() => setShowAddForm(!showAddForm)} size="lg" className="shadow-lg shadow-primary/20 w-full sm:w-auto">
-                        <Plus className="w-5 h-5 mr-2" />
-                        {t('SHTO MJET')}
-                    </Button>
-                </div>
+            <div className="space-y-7">
+                <PageHeader
+                    eyebrow="Paneli"
+                    title="Garage Command Center"
+                    description="Monitor vehicles, paperwork deadlines, servicing activity, and all costs from one mobile-first dashboard."
+                    actions={
+                        <>
+                            <Button variant="outline" className="h-11 rounded-xl">
+                                <DollarSign className="mr-2 h-4 w-4 text-emerald-400" />
+                                Log shpenzim
+                            </Button>
+                            <Button onClick={() => setIsVehicleModalOpen(true)} className="h-11 rounded-xl font-bold">
+                                <Plus className="mr-2 h-4 w-4 stroke-[3]" />
+                                Shto mjet
+                            </Button>
+                        </>
+                    }
+                />
+
                 {deleteError && (
-                    <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">
                         {deleteError}
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                    <StatCard icon={CarIcon} label="Vehicles" value={vehicles.length.toString()} color="bg-blue-600" detail="Registered in your garage" />
-                    <StatCard icon={DollarSign} label="This Month" value={formatCurrency(monthlySpend)} color="bg-emerald-600" detail="All logged costs" />
-                    <StatCard icon={Receipt} label="Total Tracked" value={formatCurrency(totalSpend)} color="bg-indigo-600" detail={`${formatCurrency(linkedSpend)} from linked records`} />
-                    <StatCard icon={Bell} label="Due Soon" value={dueSoon.length.toString()} color="bg-amber-500" detail="Next 30 days" />
-                </div>
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard icon={CarIcon} label="Mjetet" value={vehicles.length.toString()} detail="Registered profiles" tone="blue" />
+                    <MetricCard icon={DollarSign} label="Kete muaj" value={formatCurrency(monthlySpend)} detail="All logged costs" tone="emerald" />
+                    <MetricCard icon={CreditCard} label="Gjithsej" value={formatCurrency(totalSpend)} detail={`${formatCurrency(linkedSpend)} from linked records`} tone="indigo" />
+                    <MetricCard icon={Bell} label="Afatet" value={dueSoonCount.toString()} detail="Deadlines in 30 days" tone={dueSoonCount > 0 ? 'amber' : 'blue'} />
+                </section>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="p-5">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-bold text-lg">Recent Costs</h2>
-                            <Receipt className="w-5 h-5 text-muted-foreground" />
-                        </div>
-                        {recentExpenses.length === 0 ? (
-                            <p className="text-sm text-muted-foreground py-6">No expenses logged yet.</p>
-                        ) : (
-                            <div className="space-y-3">
-                                {recentExpenses.map((expense) => (
-                                    <div key={expense.id} className="flex items-center justify-between gap-3 rounded-lg bg-accent/40 p-3">
-                                        <div className="min-w-0">
-                                            <p className="font-medium truncate">{expense.category}</p>
-                                            <p className="text-xs text-muted-foreground truncate">
-                                                {getVehicleName(expense.vehicleId)}
-                                                {expense.sourceType && expense.sourceType !== 'manual' ? ` - linked ${expense.sourceType}` : ''}
-                                            </p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="font-bold font-mono">{formatCurrency(expense.amount || 0)}</p>
-                                            <p className="text-xs text-muted-foreground">{expense.date?.toDate?.().toLocaleDateString()}</p>
-                                        </div>
-                                    </div>
-                                ))}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <section id="garage-section" className="space-y-4 lg:col-span-2">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight">Garazhi im</h2>
+                                <p className="text-xs text-muted-foreground">Tap a vehicle to open documents, services, expenses, and reminders.</p>
                             </div>
-                        )}
-                    </Card>
-
-                    <Card className="p-5">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="font-bold text-lg">Upcoming Deadlines</h2>
-                            <Clock className="w-5 h-5 text-muted-foreground" />
+                            {selectedVehicleFilter !== 'all' && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedVehicleFilter('all')}
+                                    className="inline-flex items-center gap-1 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs font-bold text-primary"
+                                >
+                                    Clear filter
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            )}
                         </div>
-                        {reminders.length === 0 ? (
-                            <p className="text-sm text-muted-foreground py-6">No active reminders.</p>
-                        ) : (
-                            <div className="space-y-3">
-                                {reminders.slice(0, 5).map((reminder) => (
-                                    <div key={reminder.id} className="flex items-center justify-between gap-3 rounded-lg bg-accent/40 p-3">
-                                        <div className="min-w-0">
-                                            <p className="font-medium truncate">{reminder.title}</p>
-                                            <p className="text-xs text-muted-foreground truncate">{getVehicleName(reminder.vehicleId)}</p>
-                                        </div>
-                                        <p className="text-sm font-medium shrink-0">{reminder.dueDate?.toDate?.().toLocaleDateString()}</p>
-                                    </div>
-                                ))}
+
+                        {loading ? (
+                            <div className="flex justify-center p-12">
+                                <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                             </div>
-                        )}
-                    </Card>
-                </div>
+                        ) : vehicles.length === 0 ? (
+                            <EmptyState
+                                icon={CarIcon}
+                                title="Garazhi eshte bosh"
+                                description="Add your first vehicle to start tracking documents, care history, service costs, and reminders."
+                                action={<Button onClick={() => setIsVehicleModalOpen(true)}>Shto mjet</Button>}
+                            />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                {vehicles.map((vehicle) => {
+                                    const isSelected = selectedVehicleFilter === vehicle.id;
+                                    const vehicleExpenses = expensesByVehicle[vehicle.id] || [];
+                                    const vehicleSpend = vehicleExpenses.reduce((total, expense) => total + (expense.amount || 0), 0);
+                                    const expiryDate = dateFromTimestamp(vehicle.registrationExpiry);
+                                    const expiryDays = expiryDate ? daysUntil(expiryDate) : null;
+                                    const statusTone = expiryDays !== null && expiryDays <= 30 ? 'amber' : 'emerald';
 
-                {showAddForm && (
-                    <Card className="max-w-xl mx-auto border-primary/50 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="p-6">
-                            <h2 className="text-xl font-bold mb-6 flex items-center">
-                                <CarIcon className="w-6 h-6 mr-2 text-primary" />
-                                Add New Vehicle
-                            </h2>
-                            <form onSubmit={handleAddVehicle} className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Make</label>
-                                        <Input
-                                            placeholder="Mercedes-Benz"
-                                            value={make}
-                                            onChange={(e) => setMake(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Model</label>
-                                        <Input
-                                            placeholder="S-Class 350"
-                                            value={model}
-                                            onChange={(e) => setModel(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Year</label>
-                                        <Input
-                                            type="number"
-                                            placeholder="2024"
-                                            value={year}
-                                            onChange={(e) => setYear(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Plate Number</label>
-                                        <Input
-                                            placeholder="AB 123 CD"
-                                            value={plateNumber}
-                                            onChange={(e) => setPlateNumber(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Vehicle Type</label>
-                                        <select
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                            value={vehicleType}
-                                            onChange={(e) => setVehicleType(e.target.value)}
+                                    return (
+                                        <AppSurface
+                                            key={vehicle.id}
+                                            className={`cursor-pointer p-5 transition-all hover:-translate-y-0.5 ${isSelected ? 'border-primary ring-2 ring-primary/20' : ''}`}
+                                            onClick={() => navigate(`/vehicle/${vehicle.id}`)}
                                         >
-                                            <option value="car">Car</option>
-                                            <option value="suv">SUV</option>
-                                            <option value="motorcycle">Motorcycle</option>
-                                            <option value="truck">Truck</option>
-                                            <option value="van">Van</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Current Mileage (km)</label>
-                                        <Input
-                                            type="number"
-                                            placeholder="120000"
-                                            value={currentMileage}
-                                            onChange={(e) => setCurrentMileage(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">VIN</label>
-                                        <Input
-                                            placeholder="Vehicle identification number"
-                                            value={vin}
-                                            onChange={(e) => setVin(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Insurance Expiry</label>
-                                        <Input
-                                            type="date"
-                                            value={expiry}
-                                            onChange={(e) => setExpiry(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex flex-col sm:flex-row gap-2 pt-4">
-                                    <Button type="submit" className="flex-1">Save Vehicle</Button>
-                                    <Button type="button" variant="ghost" onClick={() => setShowAddForm(false)}>Cancel</Button>
-                                </div>
-                            </form>
-                        </div>
-                    </Card>
-                )}
-
-                {loading ? (
-                    <div className="flex justify-center p-12">
-                        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                    </div>
-                ) : vehicles.length === 0 && !showAddForm ? (
-                    <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-muted-foreground/25">
-                        <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CarIcon className="w-10 h-10 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-xl font-medium">No vehicles registered</h3>
-                        <p className="text-muted-foreground mt-2 max-w-sm mx-auto">Add your first vehicle to start tracking maintenance and expenses.</p>
-                        <Button onClick={() => setShowAddForm(true)} variant="outline" className="mt-6">
-                            Register Vehicle
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {vehicles.map(vehicle => (
-                            <Card 
-                                key={vehicle.id} 
-                                className="group hover:border-primary/50 transition-all duration-300 overflow-hidden cursor-pointer"
-                                onClick={() => navigate(`/vehicle/${vehicle.id}`)}
-                            >
-                                <div className="p-6">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">
-                                            <CarIcon className="w-6 h-6 text-primary" />
-                                        </div>
-                                        <button
-                                            onClick={(e) => handleDelete(vehicle.id, e)}
-                                            className="text-muted-foreground hover:text-destructive transition-colors p-2 hover:bg-destructive/10 rounded-lg"
-                                            title="Delete Vehicle"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-
-                                    <h3 className="text-xl font-bold mb-1">{vehicle.make} {vehicle.model}</h3>
-                                    <p className="text-muted-foreground text-sm flex items-center gap-2">
-                                        <Calendar className="w-3 h-3" />
-                                        {vehicle.year}{vehicle.plateNumber ? ` - ${vehicle.plateNumber}` : ''}
-                                    </p>
-
-                                    <div className="space-y-3 pt-6 mt-4 border-t border-border/50">
-                                        {vehicle.registrationExpiry && (
-                                            <div className="flex items-center justify-between text-sm p-2 bg-accent/50 rounded-lg">
-                                                <div className="flex items-center text-muted-foreground">
-                                                    <AlertCircle className="w-4 h-4 mr-2 text-yellow-500" />
-                                                    Insurance
+                                            <div className="mb-4 flex items-start justify-between gap-3">
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    <div className="rounded-xl bg-primary/10 p-3 text-primary">
+                                                        <CarIcon className="h-6 w-6" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h3 className="truncate text-lg font-bold">{vehicle.make} {vehicle.model}</h3>
+                                                        <p className="mt-1 font-mono text-xs text-muted-foreground">{vehicle.plateNumber || 'No plate'}</p>
+                                                    </div>
                                                 </div>
-                                                <span className="font-medium text-foreground">
-                                                    {vehicle.registrationExpiry.toDate().toLocaleDateString()}
-                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => handleDelete(vehicle.id, event)}
+                                                    className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                                                    title="Delete vehicle"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
                                             </div>
-                                        )}
-                                        {!vehicle.registrationExpiry && (
-                                             <div className="flex items-center justify-between text-sm p-2 bg-accent/50 rounded-lg">
-                                                <span className="text-muted-foreground">Status</span>
-                                                <span className="font-medium text-emerald-500">Active</span>
-                                             </div>
-                                        )}
-                                    </div>
+
+                                            <div className="grid grid-cols-2 gap-3 border-t border-border/60 pt-4 text-sm">
+                                                <div>
+                                                    <p className="mi-label">Viti</p>
+                                                    <p className="mt-1 font-semibold">{vehicle.year}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="mi-label">Statusi</p>
+                                                    <div className="mt-1">
+                                                        <StatusPill tone={statusTone}>{statusTone === 'amber' ? 'Action required' : 'Healthy'}</StatusPill>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 space-y-2 border-t border-border/60 pt-4">
+                                                <Panel className="flex items-center justify-between gap-3 p-3 text-xs">
+                                                    <span className="flex items-center gap-2 text-muted-foreground">
+                                                        <ShieldAlert className="h-4 w-4 text-blue-400" />
+                                                        Registration / insurance
+                                                    </span>
+                                                    <span className="font-mono font-semibold">{expiryDate ? expiryDate.toLocaleDateString() : 'N/A'}</span>
+                                                </Panel>
+                                                <Panel className="flex items-center justify-between gap-3 p-3 text-xs">
+                                                    <span className="flex items-center gap-2 text-muted-foreground">
+                                                        <CreditCard className="h-4 w-4 text-emerald-400" />
+                                                        Total tracked
+                                                    </span>
+                                                    <span className="font-mono font-semibold text-emerald-400">{formatCurrency(vehicleSpend)}</span>
+                                                </Panel>
+                                            </div>
+                                        </AppSurface>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </section>
+
+                    <section id="deadlines-section" className="space-y-4">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight">Afatet e ardhshme</h2>
+                            <p className="text-xs text-muted-foreground">Dynamic action timeline</p>
+                        </div>
+
+                        <AppSurface className="p-5">
+                            {upcomingDeadlines.length === 0 ? (
+                                <div className="py-8 text-center">
+                                    <Calendar className="mx-auto mb-3 h-8 w-8 text-emerald-400" />
+                                    <p className="font-semibold">No active deadlines</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">Your garage is operational.</p>
                                 </div>
-                            </Card>
-                        ))}
+                            ) : (
+                                <div className="space-y-5 border-l border-border pl-4">
+                                    {upcomingDeadlines.map((deadline) => {
+                                        const Icon = deadline.icon;
+                                        const tone = deadline.daysRemaining < 0 || deadline.daysRemaining <= 15 ? 'rose' : deadline.daysRemaining <= 45 ? 'amber' : 'emerald';
+                                        const label = deadline.daysRemaining < 0 ? 'Expired' : `In ${deadline.daysRemaining} days`;
+
+                                        return (
+                                            <div key={deadline.id} className="relative">
+                                                <span className={`absolute -left-[23px] top-1 h-3.5 w-3.5 rounded-full border-2 border-background ${tone === 'rose' ? 'bg-rose-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="mi-label">{deadline.vehicleName}</p>
+                                                        <h3 className="mt-1 flex items-center gap-2 text-sm font-bold">
+                                                            <Icon className="h-4 w-4 text-muted-foreground" />
+                                                            <span className="truncate">{deadline.type}</span>
+                                                        </h3>
+                                                        <p className="mt-2 font-mono text-xs text-muted-foreground">{deadline.date.toLocaleDateString()}</p>
+                                                    </div>
+                                                    <StatusPill tone={tone}>{label}</StatusPill>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </AppSurface>
+                    </section>
+                </div>
+
+                <section className="space-y-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight">Regjistri i shpenzimeve</h2>
+                            <p className="text-xs text-muted-foreground">Review service fees, document costs, fuel, and independent expenses.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-muted-foreground" />
+                            <select
+                                value={selectedVehicleFilter}
+                                onChange={(event) => setSelectedVehicleFilter(event.target.value)}
+                                className="mi-field h-10 min-w-52"
+                            >
+                                <option value="all">All vehicles</option>
+                                {vehicles.map((vehicle) => (
+                                    <option key={vehicle.id} value={vehicle.id}>{vehicle.make} {vehicle.model}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
-                )}
+
+                    <AppSurface className="overflow-hidden p-0">
+                        {filteredExpenses.length === 0 ? (
+                            <EmptyState icon={DollarSign} title="No costs recorded" description="Costs from service records, documents, and manual expenses will appear here." />
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="border-b border-border/70 text-xs uppercase tracking-wide text-muted-foreground">
+                                        <tr>
+                                            <th className="px-5 py-4 font-semibold">Vehicle</th>
+                                            <th className="px-5 py-4 font-semibold">Category</th>
+                                            <th className="px-5 py-4 font-semibold">Notes</th>
+                                            <th className="px-5 py-4 font-semibold">Date</th>
+                                            <th className="px-5 py-4 text-right font-semibold">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/60">
+                                        {filteredExpenses.slice(0, 12).map((expense) => (
+                                            <tr key={expense.id} className="transition-colors hover:bg-accent/35">
+                                                <td className="px-5 py-4 font-semibold">{getVehicleName(expense.vehicleId)}</td>
+                                                <td className="px-5 py-4"><StatusPill tone={expense.sourceType === 'document' ? 'blue' : expense.sourceType === 'service' ? 'amber' : 'emerald'}>{expense.category}</StatusPill></td>
+                                                <td className="max-w-xs truncate px-5 py-4 text-muted-foreground">{expense.notes || expense.sourceLabel || '-'}</td>
+                                                <td className="px-5 py-4 font-mono text-xs text-muted-foreground">{expense.date?.toDate?.().toLocaleDateString() || '-'}</td>
+                                                <td className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{formatCurrency(expense.amount || 0)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </AppSurface>
+                </section>
             </div>
+
+            {isVehicleModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                    <AppSurface className="max-h-[92vh] w-full max-w-xl overflow-y-auto p-6 shadow-2xl">
+                        <div className="mb-6 flex items-start justify-between gap-4">
+                            <div>
+                                <h2 className="flex items-center gap-2 text-xl font-bold">
+                                    <CarIcon className="h-5 w-5 text-primary" />
+                                    Shto automjet te ri
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">Create the vehicle profile and first expiry reminder anchor.</p>
+                            </div>
+                            <button type="button" onClick={() => setIsVehicleModalOpen(false)} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAddVehicle} className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <Input label="Marka" placeholder="Volkswagen" value={make} onChange={(e) => setMake(e.target.value)} required />
+                                <Input label="Modeli" placeholder="Polo" value={model} onChange={(e) => setModel(e.target.value)} required />
+                                <Input label="Viti" type="number" placeholder="2020" value={year} onChange={(e) => setYear(e.target.value)} required />
+                                <Input label="Targa" placeholder="AA 000 XX" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <label className="mi-label">Vehicle type</label>
+                                    <select className="mi-field" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)}>
+                                        <option value="car">Car</option>
+                                        <option value="suv">SUV</option>
+                                        <option value="motorcycle">Motorcycle</option>
+                                        <option value="truck">Truck</option>
+                                        <option value="van">Van</option>
+                                    </select>
+                                </div>
+                                <Input label="Kilometrazhi" type="number" placeholder="120000" value={currentMileage} onChange={(e) => setCurrentMileage(e.target.value)} />
+                                <Input label="VIN" placeholder="Vehicle identification number" value={vin} onChange={(e) => setVin(e.target.value)} />
+                                <Input label="Registration / insurance expiry" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+                            </div>
+
+                            <div className="flex flex-col gap-2 pt-2 sm:flex-row">
+                                <Button type="submit" className="h-11 flex-1 rounded-xl font-bold">Shto automjet</Button>
+                                <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => setIsVehicleModalOpen(false)}>Anulo</Button>
+                            </div>
+                        </form>
+                    </AppSurface>
+                </div>
+            )}
         </Layout>
     );
 };
-
-

@@ -1,6 +1,7 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { AppSurface, StatusPill, ThemeToggle } from '../components/ui/design-system';
 import logo from '../assets/Makina Ime Logo.png';
 
 const updatedAt = '18 May 2026';
@@ -18,14 +19,17 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' }) => {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="border-b border-border bg-background/90">
+            <header className="border-b border-border/80 bg-background/90 backdrop-blur-xl">
                 <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
                     <Link to="/" className="flex items-center gap-3">
                         <img src={logo} alt="Makina Ime" className="h-9 w-auto" />
                     </Link>
-                    <Link to="/auth" className="text-sm font-medium text-primary hover:underline">
-                        Sign in
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <ThemeToggle />
+                        <Link to="/auth" className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground">
+                            Sign in
+                        </Link>
+                    </div>
                 </div>
             </header>
 
@@ -36,10 +40,10 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' }) => {
                 </Link>
 
                 <div className="mb-10 space-y-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary">
+                    <StatusPill tone="amber">
                         <ShieldCheck className="h-4 w-4" />
                         {isPrivacy ? 'Privacy and data protection' : 'Service terms'}
-                    </div>
+                    </StatusPill>
                     <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
                         {isPrivacy ? 'Privacy Policy' : 'Terms of Service'}
                     </h1>
@@ -47,7 +51,7 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' }) => {
                 </div>
 
                 {isPrivacy ? (
-                    <div className="space-y-8">
+                    <AppSurface className="space-y-8 p-6 sm:p-8">
                         <Section title="What Makina Ime Collects">
                             <p>Makina Ime collects account identity data, vehicle profile data, service records, expenses, reminders, document metadata, and the private files you choose to upload. Examples include email address, vehicle plate or VIN, mileage, expiry dates, maintenance notes, costs, and uploaded images or PDFs.</p>
                         </Section>
@@ -69,9 +73,9 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' }) => {
                         <Section title="Contact">
                             <p>For privacy questions or data rights requests, contact {contactEmail}.</p>
                         </Section>
-                    </div>
+                    </AppSurface>
                 ) : (
-                    <div className="space-y-8">
+                    <AppSurface className="space-y-8 p-6 sm:p-8">
                         <Section title="Use Of The Service">
                             <p>Makina Ime helps users organize vehicle documents, servicing, care tasks, expenses, and reminders. You are responsible for the accuracy of the information you enter and for keeping legally required vehicle documents valid.</p>
                         </Section>
@@ -90,7 +94,7 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' }) => {
                         <Section title="Contact">
                             <p>Questions about these terms can be sent to {contactEmail}.</p>
                         </Section>
-                    </div>
+                    </AppSurface>
                 )}
             </main>
         </div>

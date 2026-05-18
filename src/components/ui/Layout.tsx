@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-    LayoutDashboard, 
-    LogOut, 
-    Menu, 
-    X, 
+import {
+    Bell,
+    Car,
+    LayoutDashboard,
+    LogOut,
+    Plus,
     User,
-    Bell
 } from 'lucide-react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
-import { Button } from './Button';
+import { db } from '../../lib/firebase';
 import { cn } from '../../lib/utils';
 import { NotificationCenter } from '../NotificationCenter';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { ThemeToggle } from './design-system';
 import logo from '../../assets/Makina Ime Logo.png';
 
 interface SidebarItemProps {
@@ -22,21 +22,32 @@ interface SidebarItemProps {
     label: string;
     href: string;
     isActive?: boolean;
-    onClick?: () => void;
 }
 
-const SidebarItem = ({ icon: Icon, label, href, isActive, onClick }: SidebarItemProps) => (
+const SidebarItem = ({ icon: Icon, label, href, isActive }: SidebarItemProps) => (
     <Link
         to={href}
-        onClick={onClick}
         className={cn(
-            "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
-            isActive 
-                ? "bg-primary/10 text-primary font-medium" 
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            'flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-all',
+            isActive
+                ? 'border border-primary/20 bg-primary/10 font-bold text-primary shadow-sm'
+                : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
         )}
     >
-        <Icon className={cn("w-5 h-5", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+    </Link>
+);
+
+const MobileNavItem = ({ icon: Icon, label, href, isActive }: SidebarItemProps) => (
+    <Link
+        to={href}
+        className={cn(
+            'flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-semibold transition-colors',
+            isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+        )}
+    >
+        <Icon className="h-5 w-5" />
         <span>{label}</span>
     </Link>
 );
@@ -46,11 +57,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // Notification Logic
     useEffect(() => {
         if (!user) return;
 
@@ -61,14 +70,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setUnreadCount(snapshot.size);
-            
-            // Show browser notification for newest one if it's new
+
             snapshot.docChanges().forEach((change) => {
-                if (change.type === "added" && 'Notification' in window && Notification.permission === "granted") {
+                if (change.type === 'added' && 'Notification' in window && Notification.permission === 'granted') {
                     const data = change.doc.data();
                     new Notification(data.title, {
                         body: data.body,
-                        icon: '/pwa-192x192.png'
+                        icon: '/pwa-192x192.png',
                     });
                 }
             });
@@ -84,152 +92,122 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
     const navItems = [
         { icon: LayoutDashboard, label: t('Dashboard'), href: '/app' },
-        { icon: User, label: t('Profile Settings'), href: '/profile' },
-        // { icon: Car, label: t('My Vehicles'), href: '/vehicles' }, // Future
+        { icon: User, label: t('Profile'), href: '/profile' },
     ];
 
     return (
-        <div className="min-h-screen bg-background flex">
-            {/* Desktop Sidebar */}
-            <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card/50 backdrop-blur-xl h-screen sticky top-0">
-                <div className="p-6 border-b border-border flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <img src={logo} alt="Makina Ime" className="h-10 w-auto object-contain" />
-                    </div>
-                    <div className="relative">
-                        <button 
-                            onClick={() => setIsNotifOpen(!isNotifOpen)}
-                            className="p-2 hover:bg-accent rounded-full relative transition-colors group"
-                        >
-                            <Bell className="w-5 h-5 text-muted-foreground group-hover:text-foreground" />
-                            {unreadCount > 0 && (
-                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
-                            )}
-                        </button>
-                        {isNotifOpen && <NotificationCenter onClose={() => setIsNotifOpen(false)} />}
-                    </div>
-                </div>
+        <div className="min-h-screen bg-background text-foreground">
+            <div className="flex min-h-screen pb-20 md:pb-0">
+                <aside className="hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-border/80 bg-card/70 p-5 backdrop-blur-xl md:sticky md:top-0 md:flex">
+                    <div>
+                        <Link to="/app" className="mb-8 flex items-center gap-3">
+                            <img src={logo} alt="Makina Ime" className="h-10 w-auto object-contain" />
+                            <div>
+                                <p className="text-sm font-extrabold tracking-tight">Makina Ime</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pro Dashboard</p>
+                            </div>
+                        </Link>
 
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    {navItems.map((item) => (
-                        <SidebarItem
-                            key={item.href}
-                            icon={item.icon}
-                            label={item.label}
-                            href={item.href}
-                            isActive={location.pathname === item.href}
-                        />
-                    ))}
-                </nav>
+                        <nav className="space-y-2">
+                            {navItems.map((item) => (
+                                <SidebarItem
+                                    key={item.href}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    href={item.href}
+                                    isActive={location.pathname === item.href}
+                                />
+                            ))}
+                        </nav>
+                    </div>
 
-                <div className="p-4 border-t border-border">
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-accent/50 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                            <User className="w-4 h-4 text-primary" />
+                    <div className="space-y-4 border-t border-border/70 pt-5">
+                        <div className="rounded-2xl border border-border/70 bg-background/45 p-3">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-emerald-500 text-sm font-bold text-white">
+                                    {(user?.email?.[0] || 'U').toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="truncate text-xs font-semibold">{user?.email}</p>
+                                    <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-primary">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                                        Secure account
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{user?.email}</p>
-                            <p className="text-xs text-muted-foreground">Pro Member</p>
+
+                        <div className="flex items-center justify-between gap-2">
+                            <ThemeToggle />
+                            <button
+                                type="button"
+                                onClick={handleSignOut}
+                                className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-500/10"
+                            >
+                                <LogOut className="h-4 w-4" />
+                                {t('Sign Out')}
+                            </button>
+                        </div>
+
+                        <div className="flex justify-center gap-4 text-[11px] text-muted-foreground">
+                            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+                            <Link to="/terms" className="hover:text-foreground">Terms</Link>
                         </div>
                     </div>
-                    <Button 
-                        variant="ghost" 
-                        className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={handleSignOut}
-                    >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        {t('Sign Out')}
-                    </Button>
-                    <div className="mt-3 flex gap-3 px-1 text-xs text-muted-foreground">
-                        <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-                        <Link to="/terms" className="hover:text-foreground">Terms</Link>
-                    </div>
-                </div>
-            </aside>
+                </aside>
 
-            {/* Mobile Sidebar Overlay */}
-            {isMobileMenuOpen && (
-                <div 
-                    className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 md:hidden"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                />
-            )}
+                <main className="min-w-0 flex-1">
+                    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/80 bg-background/90 px-4 backdrop-blur-xl md:hidden">
+                        <Link to="/app" className="flex items-center gap-2.5">
+                            <img src={logo} alt="Makina Ime" className="h-8 w-auto object-contain" />
+                        </Link>
+                        <div className="flex items-center gap-2">
+                            <ThemeToggle className="h-9 w-9" />
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsNotifOpen(!isNotifOpen)}
+                                    className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-accent/60 text-muted-foreground"
+                                >
+                                    <Bell className="h-4 w-4" />
+                                    {unreadCount > 0 && (
+                                        <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-background" />
+                                    )}
+                                </button>
+                                {isNotifOpen && <NotificationCenter onClose={() => setIsNotifOpen(false)} />}
+                            </div>
+                        </div>
+                    </header>
 
-            {/* Mobile Sidebar */}
-            <div className={cn(
-                "fixed inset-y-0 left-0 z-50 w-72 bg-card border-r border-border transform transition-transform duration-200 md:hidden flex flex-col",
-                isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-            )}>
-                 <div className="p-6 border-b border-border flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <img src={logo} alt="Makina Ime" className="h-9 w-auto object-contain" />
-                    </div>
-                    <button onClick={() => setIsMobileMenuOpen(false)}>
-                        <X className="w-6 h-6 text-muted-foreground" />
-                    </button>
-                </div>
-                <nav className="flex-1 p-4 space-y-1">
-                    {navItems.map((item) => (
-                        <SidebarItem
-                            key={item.href}
-                            icon={item.icon}
-                            label={item.label}
-                            href={item.href}
-                            isActive={location.pathname === item.href}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                        />
-                    ))}
-                </nav>
-                <div className="p-4 border-t border-border">
-                    <Button 
-                        variant="ghost" 
-                        className="w-full justify-start text-destructive"
-                        onClick={handleSignOut}
-                    >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        {t('Sign Out')}
-                    </Button>
-                    <div className="mt-3 flex gap-3 px-1 text-xs text-muted-foreground">
-                        <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-                        <Link to="/terms" className="hover:text-foreground">Terms</Link>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <main className="flex-1 flex flex-col min-w-0">
-                {/* Mobile Header */}
-                <header className="md:hidden h-16 border-b border-border flex items-center justify-between px-4 bg-background/50 backdrop-blur-md sticky top-0 z-40">
-                    <div className="flex items-center">
-                        <button onClick={() => setIsMobileMenuOpen(true)}>
-                            <Menu className="w-6 h-6 text-foreground" />
-                        </button>
-                        <span className="ml-4 font-semibold">Makina Ime</span>
-                    </div>
-                    
-                    <div className="relative">
-                        <button 
-                            onClick={() => setIsNotifOpen(!isNotifOpen)}
-                            className="p-2 hover:bg-accent rounded-full relative transition-colors"
-                        >
-                            <Bell className="w-6 h-6 text-muted-foreground" />
-                            {unreadCount > 0 && (
-                                <span className="absolute top-1 right-1 w-4 h-4 bg-primary text-[10px] font-bold text-primary-foreground rounded-full flex items-center justify-center animate-pulse">
-                                    {unreadCount}
-                                </span>
-                            )}
-                        </button>
-                        {isNotifOpen && <NotificationCenter onClose={() => setIsNotifOpen(false)} />}
-                    </div>
-                </header>
-
-                <div className="flex-1 overflow-y-auto p-4 md:p-8">
-                    <div className="mx-auto max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 md:py-8 lg:px-10">
                         {children}
                     </div>
-                </div>
-            </main>
+                </main>
+            </div>
+
+            <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-end justify-around border-t border-border/80 bg-card/95 px-2 py-2 pb-safe backdrop-blur-xl md:hidden">
+                <MobileNavItem icon={LayoutDashboard} label="Paneli" href="/app" isActive={location.pathname === '/app'} />
+                <MobileNavItem icon={Car} label="Garazhi" href="/app" isActive={location.pathname.startsWith('/vehicle')} />
+                <Link
+                    to="/app"
+                    className="relative -top-5 flex h-14 w-14 items-center justify-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                    aria-label="Add record"
+                >
+                    <Plus className="h-6 w-6 stroke-[3]" />
+                </Link>
+                <button
+                    type="button"
+                    onClick={() => setIsNotifOpen(!isNotifOpen)}
+                    className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-semibold text-muted-foreground"
+                >
+                    <span className="relative">
+                        <Bell className="h-5 w-5" />
+                        {unreadCount > 0 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500" />}
+                    </span>
+                    Afatet
+                </button>
+                <MobileNavItem icon={User} label="Profili" href="/profile" isActive={location.pathname === '/profile'} />
+            </nav>
         </div>
     );
 };
-

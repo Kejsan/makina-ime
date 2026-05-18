@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Auth } from './pages/Auth';
 import { Dashboard } from './pages/Dashboard';
 import { Landing } from './pages/Landing';
@@ -25,41 +26,43 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/privacy" element={<LegalPage type="privacy" />} />
-          <Route path="/terms" element={<LegalPage type="terms" />} />
-          <Route
-            path="/app"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route path="/dashboard" element={<Navigate to="/app" replace />} />
-          <Route
-            path="/profile"
-            element={
-              <PrivateRoute>
-                <ProfileSettings />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/vehicle/:id"
-            element={
-              <PrivateRoute>
-                <VehicleDetails />
-              </PrivateRoute>
-            }
-          />
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/privacy" element={<LegalPage type="privacy" />} />
+            <Route path="/terms" element={<LegalPage type="terms" />} />
+            <Route
+              path="/app"
+              element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+            <Route
+              path="/profile"
+              element={
+                <PrivateRoute>
+                  <ProfileSettings />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/vehicle/:id"
+              element={
+                <PrivateRoute>
+                  <VehicleDetails />
+                </PrivateRoute>
+              }
+            />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

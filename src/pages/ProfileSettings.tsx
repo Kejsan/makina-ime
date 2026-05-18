@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { addDoc, collection, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
 import { Download, FileText, ShieldCheck, Trash2 } from 'lucide-react';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Layout } from '../components/ui/Layout';
+import { AppSurface, PageHeader, Panel } from '../components/ui/design-system';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 
@@ -126,12 +126,11 @@ export const ProfileSettings = () => {
     return (
         <Layout>
             <div className="space-y-6">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
-                    <p className="mt-1 text-muted-foreground">
-                        Account privacy, data access, and security controls.
-                    </p>
-                </div>
+                <PageHeader
+                    eyebrow="Profili"
+                    title="Profile Settings"
+                    description="Account privacy, data access, deletion requests, and storage transparency."
+                />
 
                 {(message || error) && (
                     <div className={`rounded-lg border p-4 text-sm ${error ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'}`}>
@@ -140,7 +139,7 @@ export const ProfileSettings = () => {
                 )}
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                    <Card className="p-5">
+                    <AppSurface className="p-5">
                         <div className="mb-4 flex items-center gap-3">
                             <ShieldCheck className="h-6 w-6 text-primary" />
                             <div>
@@ -156,15 +155,15 @@ export const ProfileSettings = () => {
                                 ['Brevo', 'Transactional reminder email delivery metadata.'],
                                 ['Netlify', 'Hosting and serverless function execution.'],
                             ].map(([name, detail]) => (
-                                <div key={name} className="rounded-lg bg-accent/40 p-3">
+                                <Panel key={name} className="p-3">
                                     <p className="font-medium">{name}</p>
                                     <p className="text-muted-foreground">{detail}</p>
-                                </div>
+                                </Panel>
                             ))}
                         </div>
-                    </Card>
+                    </AppSurface>
 
-                    <Card className="p-5">
+                    <AppSurface className="p-5">
                         <div className="mb-4 flex items-center gap-3">
                             <FileText className="h-6 w-6 text-primary" />
                             <div>
@@ -175,15 +174,15 @@ export const ProfileSettings = () => {
                         <div className="space-y-3 text-sm text-muted-foreground">
                             <p>Privacy and terms are public before sign-up. Export and deletion controls are available here after sign-in.</p>
                             <div className="flex flex-col gap-2 sm:flex-row">
-                                <a href="/privacy" className="inline-flex h-10 items-center justify-center rounded-md border border-input px-4 font-medium text-foreground hover:bg-accent">Privacy Policy</a>
-                                <a href="/terms" className="inline-flex h-10 items-center justify-center rounded-md border border-input px-4 font-medium text-foreground hover:bg-accent">Terms</a>
+                                <a href="/privacy" className="inline-flex h-10 items-center justify-center rounded-xl border border-input px-4 font-medium text-foreground hover:bg-accent">Privacy Policy</a>
+                                <a href="/terms" className="inline-flex h-10 items-center justify-center rounded-xl border border-input px-4 font-medium text-foreground hover:bg-accent">Terms</a>
                             </div>
                         </div>
-                    </Card>
+                    </AppSurface>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                    <Card className="p-5">
+                    <AppSurface className="p-5">
                         <Download className="mb-4 h-6 w-6 text-primary" />
                         <h2 className="font-semibold">Export my data</h2>
                         <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -192,9 +191,9 @@ export const ProfileSettings = () => {
                         <Button className="mt-4 w-full sm:w-auto" onClick={exportMyData} isLoading={isExporting}>
                             Export data
                         </Button>
-                    </Card>
+                    </AppSurface>
 
-                    <Card className="border-destructive/30 p-5">
+                    <AppSurface className="border-destructive/30 p-5">
                         <Trash2 className="mb-4 h-6 w-6 text-destructive" />
                         <h2 className="font-semibold">Delete account request</h2>
                         <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -203,7 +202,7 @@ export const ProfileSettings = () => {
                         <Button className="mt-4 w-full sm:w-auto" variant="destructive" onClick={requestAccountDeletion} isLoading={isRequestingDeletion}>
                             Request deletion
                         </Button>
-                    </Card>
+                    </AppSurface>
                 </div>
             </div>
         </Layout>
