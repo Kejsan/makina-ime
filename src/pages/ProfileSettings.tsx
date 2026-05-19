@@ -1,11 +1,22 @@
-import { useState } from 'react';
-import { addDoc, collection, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
-import { Download, FileText, ShieldCheck, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { Bell, Download, FileText, Globe2, Mail, ShieldCheck, Trash2 } from 'lucide-react';
+import i18n from '../i18n';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { Layout } from '../components/ui/Layout';
 import { AppSurface, PageHeader, Panel } from '../components/ui/design-system';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
+import type { UserPreferences } from '../lib/types';
+
+const defaultPreferences = (): UserPreferences => ({
+    language: 'sq',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Tirane',
+    defaultReminderLeadTimeDays: 14,
+    browserNotificationsEnabled: false,
+    emailReminderEnabled: true,
+});
 
 const toPlainJson = (value: unknown): unknown => {
     const timestampLike = value as { toDate?: unknown };
@@ -44,6 +55,57 @@ export const ProfileSettings = () => {
     const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
+    const [savingPreferences, setSavingPreferences] = useState(false);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+            const data = snapshot.data() as Partial<UserPreferences> | undefined;
+            const merged = { ...defaultPreferences(), ...data };
+            setPreferences(merged);
+            if (merged.language && i18n.language !== merged.language) {
+                i18n.changeLanguage(merged.language);
+            }
+        });
+
+        return unsubscribe;
+    }, [user]);
+
+    const updatePreference = <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
+        setPreferences((previous) => ({ ...previous, [key]: value }));
+    };
+
+    const savePreferences = async () => {
+        if (!user) return;
+        setSavingPreferences(true);
+        setError('');
+        setMessage('');
+
+        try {
+            await setDoc(doc(db, 'users', user.uid), {
+                ...preferences,
+                updatedAt: serverTimestamp(),
+            }, { merge: true });
+            await i18n.changeLanguage(preferences.language);
+            setMessage('Preferences saved.');
+        } catch {
+            setError('Could not save preferences. Please try again.');
+        } finally {
+            setSavingPreferences(false);
+        }
+    };
+
+    const requestBrowserNotifications = async () => {
+        if (!('Notification' in window)) {
+            setError('This browser does not support notifications.');
+            return;
+        }
+
+        const permission = await Notification.requestPermission();
+        updatePreference('browserNotificationsEnabled', permission === 'granted');
+    };
 
     const exportMyData = async () => {
         if (!user) return;
@@ -139,6 +201,67 @@ export const ProfileSettings = () => {
                 )}
 
                 <div className="grid gap-4 lg:grid-cols-2">
+                    <AppSurface className="p-5 lg:col-span-2">
+                        <div className="mb-4 flex items-center gap-3">
+                            <Globe2 className="h-6 w-6 text-primary" />
+                            <div>
+                                <h2 className="font-semibold">Language, timezone, and reminders</h2>
+                                <p className="text-sm text-muted-foreground">These preferences control app labels and reminder delivery behavior.</p>
+                            </div>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <div className="space-y-2">
+                                <label className="mi-label">Language</label>
+                                <select className="mi-field" value={preferences.language} onChange={(event) => updatePreference('language', event.target.value as UserPreferences['language'])}>
+                                    <option value="sq">Shqip</option>
+                                    <option value="en">English</option>
+                                    <option value="it">Italiano</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="mi-label">Timezone</label>
+                                <select className="mi-field" value={preferences.timezone} onChange={(event) => updatePreference('timezone', event.target.value)}>
+                                    <option value="Europe/Tirane">Europe/Tirane</option>
+                                    <option value="Europe/Rome">Europe/Rome</option>
+                                    <option value="Europe/London">Europe/London</option>
+                                    <option value="UTC">UTC</option>
+                                    <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>Browser default</option>
+                                </select>
+                            </div>
+                            <Input
+                                label="Default reminder lead time"
+                                type="number"
+                                min="0"
+                                max="365"
+                                value={preferences.defaultReminderLeadTimeDays}
+                                onChange={(event) => updatePreference('defaultReminderLeadTimeDays', parseInt(event.target.value || '0'))}
+                            />
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background/50 p-4 text-sm">
+                                <span className="flex items-center gap-3">
+                                    <Bell className="h-5 w-5 text-primary" />
+                                    <span>
+                                        <span className="block font-semibold">Browser notifications</span>
+                                        <span className="text-xs text-muted-foreground">Uses this browser permission and in-app notification records.</span>
+                                    </span>
+                                </span>
+                                <input type="checkbox" checked={preferences.browserNotificationsEnabled} onChange={requestBrowserNotifications} className="h-5 w-5 accent-primary" />
+                            </label>
+                            <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background/50 p-4 text-sm">
+                                <span className="flex items-center gap-3">
+                                    <Mail className="h-5 w-5 text-primary" />
+                                    <span>
+                                        <span className="block font-semibold">Email reminders</span>
+                                        <span className="text-xs text-muted-foreground">Transactional reminder emails only.</span>
+                                    </span>
+                                </span>
+                                <input type="checkbox" checked={preferences.emailReminderEnabled} onChange={(event) => updatePreference('emailReminderEnabled', event.target.checked)} className="h-5 w-5 accent-primary" />
+                            </label>
+                        </div>
+                        <Button className="mt-4" onClick={savePreferences} isLoading={savingPreferences}>Save preferences</Button>
+                    </AppSurface>
+
                     <AppSurface className="p-5">
                         <div className="mb-4 flex items-center gap-3">
                             <ShieldCheck className="h-6 w-6 text-primary" />

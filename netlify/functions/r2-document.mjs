@@ -130,6 +130,15 @@ const requireDocumentType = (body) => {
   return type;
 };
 
+const optionalSafeMetadataString = (body, field, maxLength = 80) => {
+  const value = optionalString(body, field, maxLength);
+  if (!value) return null;
+  if (!/^[\w\s./:-]+$/i.test(value)) {
+    throw Object.assign(new Error(`Invalid ${field}`), { statusCode: 400 });
+  }
+  return value;
+};
+
 const parseBody = (event) => {
   try {
     const body = event.body ? JSON.parse(event.body) : {};
@@ -325,7 +334,7 @@ const createUploadUrl = async (uid, body) => {
 };
 
 const finalizeUpload = async (uid, body) => {
-  assertAllowedKeys(body, ['vehicleId', 'documentId', 'key', 'name', 'type', 'contentType', 'size', 'issueDate', 'expiryDate', 'cost']);
+  assertAllowedKeys(body, ['vehicleId', 'documentId', 'key', 'name', 'type', 'contentType', 'size', 'issueDate', 'expiryDate', 'cost', 'plateNumber', 'vin', 'referenceNumber', 'ocrAssisted']);
   const vehicleId = requireSafeId(body, 'vehicleId');
   const documentId = requireSafeId(body, 'documentId');
   const key = requireSafeString(body, 'key', 700);
@@ -343,6 +352,14 @@ const finalizeUpload = async (uid, body) => {
   const name = sanitizeFileName(requireSafeString(body, 'name', 180));
   const issueDate = optionalString(body, 'issueDate', 40);
   const expiryDate = optionalString(body, 'expiryDate', 40);
+  const plateNumber = optionalSafeMetadataString(body, 'plateNumber', 30);
+  const vin = optionalSafeMetadataString(body, 'vin', 30);
+  const referenceNumber = optionalSafeMetadataString(body, 'referenceNumber', 80);
+  const ocrAssisted = body.ocrAssisted === undefined || body.ocrAssisted === null ? false : body.ocrAssisted;
+
+  if (typeof ocrAssisted !== 'boolean') {
+    throw Object.assign(new Error('Invalid ocrAssisted'), { statusCode: 400 });
+  }
 
   if (!Number.isFinite(cost) || cost < 0 || cost > 1000000) {
     throw Object.assign(new Error('Invalid document cost'), { statusCode: 400 });
@@ -382,6 +399,10 @@ const finalizeUpload = async (uid, body) => {
     size,
     issueDate,
     expiryDate,
+    plateNumber,
+    vin,
+    referenceNumber,
+    ocrAssisted,
     cost: cost > 0 ? cost : 0,
     expenseId,
     uploadedAt: FieldValue.serverTimestamp(),

@@ -6,6 +6,18 @@ export interface Vehicle {
     model: string;
     year: number;
     userId: string;
+    plateNumber?: string;
+    vin?: string;
+    vehicleType?: string;
+    currentMileage?: number;
+    registrationExpiry?: Timestamp | null;
+    engineCapacity?: number;
+    estimatedValue?: number;
+    isLuxury?: boolean;
+    technicalInspectionExpiry?: Timestamp | null;
+    tplInsuranceExpiry?: Timestamp | null;
+    roadTaxExpiry?: Timestamp | null;
+    tintedGlassCertificateExpiry?: Timestamp | null;
     createdAt: Timestamp;
 }
 
@@ -49,6 +61,10 @@ export interface Document {
     cost?: number;
     expenseId?: string;
     userId?: string;
+    plateNumber?: string | null;
+    vin?: string | null;
+    referenceNumber?: string | null;
+    ocrAssisted?: boolean;
 }
 
 export interface Reminder {
@@ -59,9 +75,18 @@ export interface Reminder {
     title: string;
     dueDate: Timestamp;
     leadTimeDays: number;
-    recurrence: 'none' | 'yearly' | 'monthly';
+    recurrence: 'none' | 'yearly' | 'monthly' | 'biennial';
     completed: boolean;
     createdAt: Timestamp;
+}
+
+export interface UserPreferences {
+    language: 'sq' | 'en' | 'it';
+    timezone: string;
+    defaultReminderLeadTimeDays: number;
+    browserNotificationsEnabled: boolean;
+    emailReminderEnabled: boolean;
+    updatedAt?: Timestamp;
 }
 
 export interface AppNotification {

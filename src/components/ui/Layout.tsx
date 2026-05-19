@@ -4,12 +4,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     Bell,
     Car,
+    CalendarDays,
     LayoutDashboard,
     LogOut,
     Plus,
     User,
 } from 'lucide-react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebase';
 import { cn } from '../../lib/utils';
@@ -59,6 +60,14 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
+
+    useEffect(() => {
+        if (!user) return;
+        return onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+            setBrowserNotificationsEnabled(snapshot.data()?.browserNotificationsEnabled === true);
+        });
+    }, [user]);
 
     useEffect(() => {
         if (!user) return;
@@ -72,7 +81,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             setUnreadCount(snapshot.size);
 
             snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added' && 'Notification' in window && Notification.permission === 'granted') {
+                if (change.type === 'added' && browserNotificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
                     const data = change.doc.data();
                     new Notification(data.title, {
                         body: data.body,
@@ -83,7 +92,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         });
 
         return unsubscribe;
-    }, [user]);
+    }, [user, browserNotificationsEnabled]);
 
     const handleSignOut = async () => {
         await signOut();
@@ -92,6 +101,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
     const navItems = [
         { icon: LayoutDashboard, label: t('Dashboard'), href: '/app' },
+        { icon: CalendarDays, label: t('Calendar'), href: '/calendar' },
         { icon: User, label: t('Profile'), href: '/profile' },
     ];
 
@@ -195,17 +205,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 >
                     <Plus className="h-6 w-6 stroke-[3]" />
                 </Link>
-                <button
-                    type="button"
-                    onClick={() => setIsNotifOpen(!isNotifOpen)}
-                    className="flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-semibold text-muted-foreground"
-                >
-                    <span className="relative">
-                        <Bell className="h-5 w-5" />
-                        {unreadCount > 0 && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500" />}
-                    </span>
-                    Afatet
-                </button>
+                <MobileNavItem icon={CalendarDays} label="Kalendari" href="/calendar" isActive={location.pathname === '/calendar'} />
                 <MobileNavItem icon={User} label="Profili" href="/profile" isActive={location.pathname === '/profile'} />
             </nav>
         </div>

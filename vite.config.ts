@@ -9,6 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      workbox: {
+        globIgnores: ['**/ocr-*.js', '**/vendor-ocr-*.js', '**/pdf.worker-*.mjs']
+      },
       manifest: {
         name: 'Makina Ime',
         short_name: 'Makina Ime',
@@ -36,4 +39,21 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) return 'vendor-react'
+          if (id.includes('@firebase/auth') || id.includes('firebase/auth')) return 'vendor-firebase-auth'
+          if (id.includes('@firebase/firestore') || id.includes('firebase/firestore')) return 'vendor-firebase-firestore'
+          if (id.includes('@firebase') || id.includes('firebase/')) return 'vendor-firebase-core'
+          if (id.includes('i18next') || id.includes('react-i18next')) return 'vendor-i18n'
+          if (id.includes('lucide-react')) return 'vendor-icons'
+          if (id.includes('pdfjs-dist') || id.includes('tesseract.js')) return 'vendor-ocr'
+          return undefined
+        }
+      }
+    }
+  }
 })

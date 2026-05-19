@@ -34,6 +34,13 @@ interface Vehicle {
     vehicleType?: string;
     currentMileage?: number;
     registrationExpiry?: Timestamp | null;
+    engineCapacity?: number;
+    estimatedValue?: number;
+    isLuxury?: boolean;
+    technicalInspectionExpiry?: Timestamp | null;
+    tplInsuranceExpiry?: Timestamp | null;
+    roadTaxExpiry?: Timestamp | null;
+    tintedGlassCertificateExpiry?: Timestamp | null;
 }
 
 const formatCurrency = (value: number) => `€${value.toFixed(2)}`;
@@ -67,6 +74,13 @@ export const Dashboard = () => {
     const [vehicleType, setVehicleType] = useState('car');
     const [currentMileage, setCurrentMileage] = useState('');
     const [expiry, setExpiry] = useState('');
+    const [engineCapacity, setEngineCapacity] = useState('');
+    const [estimatedValue, setEstimatedValue] = useState('');
+    const [isLuxury, setIsLuxury] = useState(false);
+    const [technicalInspectionExpiry, setTechnicalInspectionExpiry] = useState('');
+    const [tplInsuranceExpiry, setTplInsuranceExpiry] = useState('');
+    const [roadTaxExpiry, setRoadTaxExpiry] = useState('');
+    const [tintedGlassCertificateExpiry, setTintedGlassCertificateExpiry] = useState('');
 
     useEffect(() => {
         if (!user) return;
@@ -124,6 +138,13 @@ export const Dashboard = () => {
                 vehicleType,
                 currentMileage: currentMileage ? parseInt(currentMileage) : 0,
                 registrationExpiry: expiry ? Timestamp.fromDate(new Date(expiry)) : null,
+                engineCapacity: engineCapacity ? parseInt(engineCapacity) : null,
+                estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
+                isLuxury,
+                technicalInspectionExpiry: technicalInspectionExpiry ? Timestamp.fromDate(new Date(technicalInspectionExpiry)) : null,
+                tplInsuranceExpiry: tplInsuranceExpiry ? Timestamp.fromDate(new Date(tplInsuranceExpiry)) : null,
+                roadTaxExpiry: roadTaxExpiry ? Timestamp.fromDate(new Date(roadTaxExpiry)) : null,
+                tintedGlassCertificateExpiry: tintedGlassCertificateExpiry ? Timestamp.fromDate(new Date(tintedGlassCertificateExpiry)) : null,
                 createdAt: Timestamp.now(),
             });
 
@@ -136,6 +157,13 @@ export const Dashboard = () => {
             setVehicleType('car');
             setCurrentMileage('');
             setExpiry('');
+            setEngineCapacity('');
+            setEstimatedValue('');
+            setIsLuxury(false);
+            setTechnicalInspectionExpiry('');
+            setTplInsuranceExpiry('');
+            setRoadTaxExpiry('');
+            setTintedGlassCertificateExpiry('');
         } catch {
             console.error('Vehicle creation failed');
         }
@@ -172,18 +200,28 @@ export const Dashboard = () => {
         .reduce((total, expense) => total + (expense.amount || 0), 0);
 
     const upcomingDeadlines = useMemo(() => {
-        const registrationDeadlines = vehicles.flatMap((vehicle) => {
-            const expiryDate = dateFromTimestamp(vehicle.registrationExpiry);
-            if (!expiryDate) return [];
-            return [{
-                id: `${vehicle.id}-registration`,
-                vehicleId: vehicle.id,
-                vehicleName: `${vehicle.make} ${vehicle.model}`,
-                type: 'Registration / insurance',
-                date: expiryDate,
-                daysRemaining: daysUntil(expiryDate),
-                icon: ShieldAlert,
-            }];
+        const legalDeadlines = vehicles.flatMap((vehicle) => {
+            const entries = [
+                ['registration', 'Registration', vehicle.registrationExpiry, ShieldAlert],
+                ['tpl', 'TPL insurance', vehicle.tplInsuranceExpiry, ShieldAlert],
+                ['inspection', 'Technical inspection', vehicle.technicalInspectionExpiry, Wrench],
+                ['tax', 'Road tax', vehicle.roadTaxExpiry, FileText],
+                ['tinted-glass', 'Tinted glass certificate', vehicle.tintedGlassCertificateExpiry, FileText],
+            ] as const;
+
+            return entries.flatMap(([key, label, timestamp, icon]) => {
+                const expiryDate = dateFromTimestamp(timestamp);
+                if (!expiryDate) return [];
+                return [{
+                    id: `${vehicle.id}-${key}`,
+                    vehicleId: vehicle.id,
+                    vehicleName: `${vehicle.make} ${vehicle.model}`,
+                    type: label,
+                    date: expiryDate,
+                    daysRemaining: daysUntil(expiryDate),
+                    icon,
+                }];
+            });
         });
 
         const reminderDeadlines = reminders
@@ -200,7 +238,7 @@ export const Dashboard = () => {
                 icon: reminder.type === 'maintenance' ? Wrench : reminder.type === 'tax' ? FileText : Calendar,
             }));
 
-        return [...registrationDeadlines, ...reminderDeadlines]
+        return [...legalDeadlines, ...reminderDeadlines]
             .sort((a, b) => a.daysRemaining - b.daysRemaining)
             .slice(0, 8);
     }, [reminders, vehicles]);
@@ -484,6 +522,28 @@ export const Dashboard = () => {
                                 <Input label="VIN" placeholder="Vehicle identification number" value={vin} onChange={(e) => setVin(e.target.value)} />
                                 <Input label="Registration / insurance expiry" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
                             </div>
+
+                            <Panel className="space-y-4 p-4">
+                                <div>
+                                    <p className="mi-label text-primary">Legal and valuation details</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">Optional fields used for reminders, compliance, and ownership records.</p>
+                                </div>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <Input label="Engine capacity (cc)" type="number" placeholder="1598" value={engineCapacity} onChange={(e) => setEngineCapacity(e.target.value)} />
+                                    <Input label="Estimated value (€)" type="number" step="0.01" placeholder="6500" value={estimatedValue} onChange={(e) => setEstimatedValue(e.target.value)} />
+                                    <Input label="Technical inspection expiry" type="date" value={technicalInspectionExpiry} onChange={(e) => setTechnicalInspectionExpiry(e.target.value)} />
+                                    <Input label="TPL insurance expiry" type="date" value={tplInsuranceExpiry} onChange={(e) => setTplInsuranceExpiry(e.target.value)} />
+                                    <Input label="Road tax expiry" type="date" value={roadTaxExpiry} onChange={(e) => setRoadTaxExpiry(e.target.value)} />
+                                    <Input label="Tinted-glass certificate expiry" type="date" value={tintedGlassCertificateExpiry} onChange={(e) => setTintedGlassCertificateExpiry(e.target.value)} />
+                                </div>
+                                <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background/50 p-3 text-sm">
+                                    <span>
+                                        <span className="block font-semibold">Luxury vehicle flag</span>
+                                        <span className="text-xs text-muted-foreground">Used for future tax and ownership logic.</span>
+                                    </span>
+                                    <input type="checkbox" checked={isLuxury} onChange={(e) => setIsLuxury(e.target.checked)} className="h-5 w-5 accent-primary" />
+                                </label>
+                            </Panel>
 
                             <div className="flex flex-col gap-2 pt-2 sm:flex-row">
                                 <Button type="submit" className="h-11 flex-1 rounded-xl font-bold">Shto automjet</Button>
