@@ -29,6 +29,7 @@ interface Vehicle {
     make: string;
     model: string;
     year: number;
+    ownerType?: 'personal' | 'organization';
     plateNumber?: string;
     vin?: string;
     vehicleType?: string;
@@ -87,7 +88,9 @@ export const Dashboard = () => {
 
         const q = query(collection(db, 'vehicles'), where('userId', '==', user.uid));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setVehicles(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Vehicle)));
+            setVehicles(snapshot.docs
+                .map((doc) => ({ id: doc.id, ...doc.data() } as Vehicle))
+                .filter((vehicle) => vehicle.ownerType !== 'organization'));
             setLoading(false);
         });
 
@@ -117,7 +120,9 @@ export const Dashboard = () => {
 
         const q = query(collection(db, 'reminders'), where('userId', '==', user.uid), where('completed', '==', false));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setReminders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Reminder)));
+            setReminders(snapshot.docs
+                .map((doc) => ({ id: doc.id, ...doc.data() } as Reminder))
+                .filter((reminder) => reminder.ownerType !== 'organization'));
         });
 
         return unsubscribe;
@@ -130,6 +135,8 @@ export const Dashboard = () => {
         try {
             await addDoc(collection(db, 'vehicles'), {
                 userId: user.uid,
+                ownerType: 'personal',
+                ownerId: user.uid,
                 make: make.trim(),
                 model: model.trim(),
                 year: parseInt(year),

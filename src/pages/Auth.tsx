@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Car, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { Building2, Car, Lock, Mail, ShieldCheck, Users } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { AppSurface, Panel, StatusPill, ThemeToggle } from '../components/ui/design-system';
@@ -13,8 +13,12 @@ export const Auth = () => {
     const { t } = useTranslation();
     const { signIn, signUp } = useAuth();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
 
-    const [isLogin, setIsLogin] = useState(true);
+    const initialType = searchParams.get('type') === 'business' ? 'business' : 'personal';
+    const initialMode = searchParams.get('mode') === 'signup' ? false : true;
+    const [accountType, setAccountType] = useState<'personal' | 'business'>(initialType);
+    const [isLogin, setIsLogin] = useState(initialMode);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [email, setEmail] = useState('');
@@ -31,7 +35,7 @@ export const Auth = () => {
             } else {
                 await signUp(email, password);
             }
-            navigate('/app');
+            navigate(accountType === 'business' ? '/business' : '/app');
         } catch (err: unknown) {
             console.error('Authentication failed');
             setError(err instanceof Error && err.message.includes('auth/')
@@ -41,6 +45,43 @@ export const Auth = () => {
             setLoading(false);
         }
     };
+
+    const setFlow = (nextType: 'personal' | 'business') => {
+        setAccountType(nextType);
+        setSearchParams({ type: nextType, mode: isLogin ? 'signin' : 'signup' });
+    };
+
+    const toggleMode = () => {
+        const nextIsLogin = !isLogin;
+        setIsLogin(nextIsLogin);
+        setSearchParams({ type: accountType, mode: nextIsLogin ? 'signin' : 'signup' });
+    };
+
+    const flowCopy = accountType === 'business'
+        ? {
+            eyebrow: t('Business fleet workspace'),
+            title: isLogin ? t('Access your fleet') : t('Create your business login'),
+            body: t('Use this path for company cars, taxi fleets, rental fleets, service vehicles, and car sellers. After registration, create or join an organization workspace.'),
+            formTitle: isLogin ? t('Sign in to business') : t('Start business setup'),
+            cta: isLogin ? t('Sign In') : t('Create Business Account'),
+            panels: [
+                { label: t('Organization roles'), icon: Users },
+                { label: t('Fleet records'), icon: Building2 },
+                { label: t('Inspections and reports'), icon: ShieldCheck },
+            ],
+        }
+        : {
+            eyebrow: t('Private garage workspace'),
+            title: isLogin ? t('Welcome back') : t('Create your personal garage'),
+            body: t('Use this path for your own vehicles. Store documents, track services and costs, and get reminders for renewals and maintenance.'),
+            formTitle: isLogin ? t('Access your dashboard') : t('Start tracking your vehicles'),
+            cta: isLogin ? t('Sign In') : t('Create Personal Account'),
+            panels: [
+                { label: t('Vehicle records'), icon: Car },
+                { label: t('Private documents'), icon: Lock },
+                { label: t('Reminder alerts'), icon: ShieldCheck },
+            ],
+        };
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -58,22 +99,34 @@ export const Auth = () => {
                 <section className="space-y-6">
                     <StatusPill tone="amber">
                         <ShieldCheck className="h-3.5 w-3.5" />
-                        {t('Private garage workspace')}
+                        {flowCopy.eyebrow}
                     </StatusPill>
                     <div className="space-y-4">
                         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-                            {isLogin ? t('Welcome back') : t('Create your garage')}
+                            {flowCopy.title}
                         </h1>
                         <p className="max-w-xl text-sm leading-7 text-muted-foreground">
-                            {t('Sign in to manage vehicle documents, costs, reminders, services, and private files with server-side ownership checks.')}
+                            {flowCopy.body}
                         </p>
                     </div>
+                    <div className="grid gap-2 rounded-2xl border border-border bg-card/60 p-1 sm:grid-cols-2">
+                        {(['personal', 'business'] as const).map((type) => (
+                            <button
+                                key={type}
+                                type="button"
+                                onClick={() => setFlow(type)}
+                                className={`rounded-xl px-4 py-3 text-sm font-bold transition-colors ${
+                                    accountType === type
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                }`}
+                            >
+                                {type === 'personal' ? t('Personal') : t('Business')}
+                            </button>
+                        ))}
+                    </div>
                     <div className="grid gap-3 sm:grid-cols-3">
-                        {[
-                            { label: t('Private R2 files'), icon: Lock },
-                            { label: t('Vehicle records'), icon: Car },
-                            { label: t('Reminder alerts'), icon: ShieldCheck },
-                        ].map(({ label, icon: Icon }) => (
+                        {flowCopy.panels.map(({ label, icon: Icon }) => (
                             <Panel key={label} className="p-4">
                                 <Icon className="mb-3 h-5 w-5 text-primary" />
                                 <p className="text-xs font-semibold">{label}</p>
@@ -85,7 +138,12 @@ export const Auth = () => {
                 <AppSurface className="p-6 sm:p-8">
                     <div className="mb-7">
                         <p className="mi-label text-primary">{isLogin ? t('Sign in') : t('Register')}</p>
-                        <h2 className="mt-2 text-2xl font-bold tracking-tight">{isLogin ? t('Access your dashboard') : t('Start tracking safely')}</h2>
+                        <h2 className="mt-2 text-2xl font-bold tracking-tight">{flowCopy.formTitle}</h2>
+                        {!isLogin && accountType === 'business' && (
+                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                {t('Next step after signup: create your organization, add vehicles, invite team members, and start fleet tracking.')}
+                            </p>
+                        )}
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
@@ -127,12 +185,12 @@ export const Auth = () => {
                         )}
 
                         <Button type="submit" className="h-12 w-full font-bold" size="lg" isLoading={loading}>
-                            {isLogin ? t('Sign In') : t('Create Account')}
+                            {flowCopy.cta}
                         </Button>
                     </form>
 
                     <div className="mt-6 border-t border-border/70 pt-5">
-                        <Button variant="ghost" className="w-full" onClick={() => setIsLogin(!isLogin)}>
+                        <Button variant="ghost" className="w-full" onClick={toggleMode}>
                             {isLogin ? t('Create an account') : t('Sign in to your account')}
                         </Button>
                     </div>
@@ -142,6 +200,8 @@ export const Auth = () => {
                         <Link to="/terms" className="font-semibold text-primary hover:underline">{t('Terms of Service')}</Link>
                         {' '}{t('and')}{' '}
                         <Link to="/privacy" className="font-semibold text-primary hover:underline">{t('Privacy Policy')}</Link>.
+                        {' '}
+                        <Link to="/cookies" className="font-semibold text-primary hover:underline">{t('Cookie Policy')}</Link>.
                     </p>
                 </AppSurface>
             </main>

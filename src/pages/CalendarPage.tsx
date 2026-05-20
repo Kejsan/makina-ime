@@ -44,7 +44,9 @@ export const CalendarPage = () => {
     useEffect(() => {
         if (!user) return;
         const unsubscribe = onSnapshot(query(collection(db, 'vehicles'), where('userId', '==', user.uid)), (snapshot) => {
-            setVehicles(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Vehicle)));
+            setVehicles(snapshot.docs
+                .map((item) => ({ id: item.id, ...item.data() } as Vehicle))
+                .filter((vehicle) => vehicle.ownerType !== 'organization'));
         });
         return unsubscribe;
     }, [user]);
@@ -52,7 +54,9 @@ export const CalendarPage = () => {
     useEffect(() => {
         if (!user) return;
         const unsubscribe = onSnapshot(query(collection(db, 'reminders'), where('userId', '==', user.uid)), (snapshot) => {
-            setReminders(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as Reminder)));
+            setReminders(snapshot.docs
+                .map((item) => ({ id: item.id, ...item.data() } as Reminder))
+                .filter((reminder) => reminder.ownerType !== 'organization'));
         });
         return unsubscribe;
     }, [user]);
@@ -93,6 +97,8 @@ export const CalendarPage = () => {
         try {
             await addDoc(collection(db, 'reminders'), {
                 userId: user.uid,
+                ownerType: 'personal',
+                ownerId: user.uid,
                 vehicleId: customReminder.vehicleId,
                 title: customReminder.title.trim(),
                 type: customReminder.type,

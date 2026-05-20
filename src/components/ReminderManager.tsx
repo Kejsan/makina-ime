@@ -21,7 +21,15 @@ const reminderTemplates = [
     { label: 'Brake service', title: 'Brake service', type: 'maintenance', leadTimeDays: 14, recurrence: 'none' },
 ] as const;
 
-export const ReminderManager = () => {
+export const ReminderManager = ({
+    ownerType = 'personal',
+    ownerId,
+    organizationId,
+}: {
+    ownerType?: 'personal' | 'organization';
+    ownerId?: string;
+    organizationId?: string;
+}) => {
     const { id: vehicleId } = useParams<{ id: string }>();
     const { user } = useAuth();
     const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -69,6 +77,9 @@ export const ReminderManager = () => {
         try {
             await addDoc(collection(db, 'reminders'), {
                 userId: user.uid,
+                ownerType,
+                ownerId: ownerId || user.uid,
+                organizationId: organizationId || null,
                 vehicleId,
                 title,
                 type,

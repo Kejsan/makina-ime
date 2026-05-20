@@ -4,10 +4,11 @@ import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 
 const ALLOWED_CONTENT_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
-const ALLOWED_DOCUMENT_TYPES = new Set(['insurance', 'registration', 'inspection', 'tax', 'service', 'ownership', 'warranty', 'maintenance', 'other']);
+const ALLOWED_DOCUMENT_TYPES = new Set(['insurance', 'registration', 'inspection', 'tax', 'service', 'ownership', 'warranty', 'maintenance', 'permit', 'taxi_permit', 'contract', 'invoice', 'other']);
 const DEFAULT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 300;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,160}$/;
+const ROLE_RANK = { viewer: 0, driver: 1, manager: 2, admin: 3, owner: 4 };
 const RATE_LIMITS = {
   createUploadUrl: { user: 20, ip: 60 },
   finalizeUpload: { user: 20, ip: 60 },
@@ -150,16 +151,37 @@ const parseBody = (event) => {
   }
 };
 
-const requireOwnedVehicle = async (uid, vehicleId) => {
+const requireOrganizationMember = async (db, uid, organizationId, minimumRole = 'driver') => {
+  const memberSnap = await db.collection('organizationMembers').doc(`${organizationId}_${uid}`).get();
+  const member = memberSnap.data();
+  if (!memberSnap.exists || member?.status !== 'active' || ROLE_RANK[member.role] < ROLE_RANK[minimumRole]) {
+    throw Object.assign(new Error('Vehicle not found'), { statusCode: 404 });
+  }
+  return member;
+};
+
+const requireAccessibleVehicle = async (uid, vehicleId, minimumOrganizationRole = 'driver') => {
   const db = getFirestore();
   const vehicleRef = db.collection('vehicles').doc(vehicleId);
   const vehicleSnap = await vehicleRef.get();
 
-  if (!vehicleSnap.exists || vehicleSnap.data()?.userId !== uid) {
+  if (!vehicleSnap.exists) {
     throw Object.assign(new Error('Vehicle not found'), { statusCode: 404 });
   }
 
-  return { db, vehicleRef };
+  const vehicle = vehicleSnap.data();
+  if (vehicle?.ownerType === 'organization') {
+    const organizationId = vehicle.ownerId || vehicle.organizationId;
+    if (!organizationId) throw Object.assign(new Error('Vehicle not found'), { statusCode: 404 });
+    const member = await requireOrganizationMember(db, uid, organizationId, minimumOrganizationRole);
+    return { db, vehicleRef, vehicle, organizationId, member };
+  }
+
+  if (vehicle?.userId !== uid) {
+    throw Object.assign(new Error('Vehicle not found'), { statusCode: 404 });
+  }
+
+  return { db, vehicleRef, vehicle, organizationId: null, member: null };
 };
 
 const getClientIp = (event) => {
@@ -311,14 +333,16 @@ const verifyR2Object = async ({ key, contentType, size }) => {
 const createUploadUrl = async (uid, body) => {
   assertAllowedKeys(body, ['vehicleId', 'fileName', 'contentType', 'size']);
   const vehicleId = requireSafeId(body, 'vehicleId');
-  const { db } = await requireOwnedVehicle(uid, vehicleId);
+  const { db, vehicle, organizationId } = await requireAccessibleVehicle(uid, vehicleId, 'driver');
   const fileName = sanitizeFileName(requireSafeString(body, 'fileName', 180));
   const contentType = requireAllowedContentType(body);
   const size = requireUploadSize(body);
   const expiresSeconds = Number(process.env.R2_SIGNED_URL_TTL_SECONDS || DEFAULT_SIGNED_URL_TTL_SECONDS);
 
   const documentRef = db.collection('vehicles').doc(vehicleId).collection('documents').doc();
-  const key = `users/${uid}/vehicles/${vehicleId}/documents/${documentRef.id}/${fileName}`;
+  const key = vehicle?.ownerType === 'organization'
+    ? `organizations/${organizationId}/vehicles/${vehicleId}/documents/${documentRef.id}/${fileName}`
+    : `users/${uid}/vehicles/${vehicleId}/documents/${documentRef.id}/${fileName}`;
 
   return {
     documentId: documentRef.id,
@@ -338,13 +362,15 @@ const finalizeUpload = async (uid, body) => {
   const vehicleId = requireSafeId(body, 'vehicleId');
   const documentId = requireSafeId(body, 'documentId');
   const key = requireSafeString(body, 'key', 700);
-  const expectedPrefix = `users/${uid}/vehicles/${vehicleId}/documents/${documentId}/`;
+  const { db, vehicle, organizationId } = await requireAccessibleVehicle(uid, vehicleId, 'driver');
+  const expectedPrefix = vehicle?.ownerType === 'organization'
+    ? `organizations/${organizationId}/vehicles/${vehicleId}/documents/${documentId}/`
+    : `users/${uid}/vehicles/${vehicleId}/documents/${documentId}/`;
 
   if (!key.startsWith(expectedPrefix)) {
     throw Object.assign(new Error('Invalid document upload key'), { statusCode: 400 });
   }
 
-  const { db } = await requireOwnedVehicle(uid, vehicleId);
   const contentType = requireAllowedContentType(body);
   const size = requireUploadSize(body);
   const cost = body.cost === undefined || body.cost === null || body.cost === '' ? 0 : Number(body.cost);
@@ -376,6 +402,9 @@ const finalizeUpload = async (uid, body) => {
     expenseId = expenseRef.id;
     batch.set(expenseRef, {
       userId: uid,
+      ownerType: vehicle?.ownerType || 'personal',
+      ownerId: vehicle?.ownerType === 'organization' ? organizationId : uid,
+      organizationId: organizationId || null,
       vehicleId,
       category: type === 'insurance' ? 'Insurance' : type === 'tax' ? 'Tax' : type === 'service' ? 'Maintenance' : 'Document',
       amount: cost,
@@ -384,12 +413,17 @@ const finalizeUpload = async (uid, body) => {
       sourceType: 'document',
       sourceId: documentId,
       sourceLabel: name,
+      createdBy: uid,
       createdAt: FieldValue.serverTimestamp(),
     });
   }
 
   batch.set(documentRef, {
     userId: uid,
+    ownerType: vehicle?.ownerType || 'personal',
+    ownerId: vehicle?.ownerType === 'organization' ? organizationId : uid,
+    organizationId: organizationId || null,
+    createdBy: uid,
     vehicleId,
     name,
     type,
@@ -414,6 +448,10 @@ const finalizeUpload = async (uid, body) => {
       const reminderRef = db.collection('reminders').doc();
       batch.set(reminderRef, {
         userId: uid,
+        ownerType: vehicle?.ownerType || 'personal',
+        ownerId: vehicle?.ownerType === 'organization' ? organizationId : uid,
+        organizationId: organizationId || null,
+        createdBy: uid,
         vehicleId,
         title: `${name} renewal`,
         type,
@@ -440,7 +478,7 @@ const createDownloadUrl = async (uid, body) => {
   assertAllowedKeys(body, ['vehicleId', 'documentId']);
   const vehicleId = requireSafeId(body, 'vehicleId');
   const documentId = requireSafeId(body, 'documentId');
-  const { db } = await requireOwnedVehicle(uid, vehicleId);
+  const { db, vehicle } = await requireAccessibleVehicle(uid, vehicleId, 'driver');
   const documentSnap = await db.collection('vehicles').doc(vehicleId).collection('documents').doc(documentId).get();
 
   if (!documentSnap.exists) {
@@ -448,7 +486,7 @@ const createDownloadUrl = async (uid, body) => {
   }
 
   const data = documentSnap.data();
-  if (data?.userId && data.userId !== uid) {
+  if (vehicle?.ownerType !== 'organization' && data?.userId && data.userId !== uid) {
     throw Object.assign(new Error('Document not found'), { statusCode: 404 });
   }
 
@@ -467,7 +505,7 @@ const deleteDocument = async (uid, body) => {
   assertAllowedKeys(body, ['vehicleId', 'documentId']);
   const vehicleId = requireSafeId(body, 'vehicleId');
   const documentId = requireSafeId(body, 'documentId');
-  const { db } = await requireOwnedVehicle(uid, vehicleId);
+  const { db, vehicle } = await requireAccessibleVehicle(uid, vehicleId, 'manager');
   const documentRef = db.collection('vehicles').doc(vehicleId).collection('documents').doc(documentId);
   const documentSnap = await documentRef.get();
 
@@ -476,7 +514,7 @@ const deleteDocument = async (uid, body) => {
   }
 
   const data = documentSnap.data();
-  if (data?.userId && data.userId !== uid) {
+  if (vehicle?.ownerType !== 'organization' && data?.userId && data.userId !== uid) {
     throw Object.assign(new Error('Document not found'), { statusCode: 404 });
   }
 
@@ -497,14 +535,21 @@ const deleteDocument = async (uid, body) => {
 const deleteVehicleCascade = async (uid, body) => {
   assertAllowedKeys(body, ['vehicleId']);
   const vehicleId = requireSafeId(body, 'vehicleId');
-  const { db, vehicleRef } = await requireOwnedVehicle(uid, vehicleId);
+  const { db, vehicleRef, vehicle, organizationId } = await requireAccessibleVehicle(uid, vehicleId, 'manager');
   const vehiclePath = db.collection('vehicles').doc(vehicleId);
 
-  const [services, expenses, documents, reminders] = await Promise.all([
+  const reminderQuery = vehicle?.ownerType === 'organization'
+    ? db.collection('reminders').where('ownerType', '==', 'organization').where('ownerId', '==', organizationId).where('vehicleId', '==', vehicleId)
+    : db.collection('reminders').where('userId', '==', uid).where('vehicleId', '==', vehicleId);
+
+  const [services, expenses, documents, reminders, inspections, issues, workOrders] = await Promise.all([
     vehiclePath.collection('services').get(),
     vehiclePath.collection('expenses').get(),
     vehiclePath.collection('documents').get(),
-    db.collection('reminders').where('userId', '==', uid).where('vehicleId', '==', vehicleId).get(),
+    reminderQuery.get(),
+    vehiclePath.collection('inspections').get(),
+    vehiclePath.collection('issues').get(),
+    vehiclePath.collection('workOrders').get(),
   ]);
 
   for (const documentSnap of documents.docs) {
@@ -530,6 +575,9 @@ const deleteVehicleCascade = async (uid, body) => {
   for (const snap of expenses.docs) await queueDelete(snap.ref);
   for (const snap of documents.docs) await queueDelete(snap.ref);
   for (const snap of reminders.docs) await queueDelete(snap.ref);
+  for (const snap of inspections.docs) await queueDelete(snap.ref);
+  for (const snap of issues.docs) await queueDelete(snap.ref);
+  for (const snap of workOrders.docs) await queueDelete(snap.ref);
   await queueDelete(vehicleRef);
 
   if (count > 0) {

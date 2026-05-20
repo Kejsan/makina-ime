@@ -5,6 +5,9 @@ import { ThemeProvider } from './context/ThemeContext';
 import './i18n';
 
 const Auth = lazy(() => import('./pages/Auth').then((module) => ({ default: module.Auth })));
+const BusinessDashboard = lazy(() => import('./pages/BusinessDashboard').then((module) => ({ default: module.BusinessDashboard })));
+const BusinessHome = lazy(() => import('./pages/BusinessHome').then((module) => ({ default: module.BusinessHome })));
+const BusinessVehicleDetails = lazy(() => import('./pages/BusinessVehicleDetails').then((module) => ({ default: module.BusinessVehicleDetails })));
 const CalendarPage = lazy(() => import('./pages/CalendarPage').then((module) => ({ default: module.CalendarPage })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const Landing = lazy(() => import('./pages/Landing').then((module) => ({ default: module.Landing })));
@@ -39,6 +42,7 @@ function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/privacy" element={<LegalPage type="privacy" />} />
+              <Route path="/cookies" element={<LegalPage type="cookies" />} />
               <Route path="/terms" element={<LegalPage type="terms" />} />
               <Route
                 path="/app"
@@ -49,6 +53,30 @@ function App() {
                 }
               />
               <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+              <Route
+                path="/business"
+                element={
+                  <PrivateRoute>
+                    <BusinessHome />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/business/:orgId"
+                element={
+                  <PrivateRoute>
+                    <BusinessDashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/business/:orgId/vehicle/:id"
+                element={
+                  <PrivateRoute>
+                    <BusinessVehicleDetails />
+                  </PrivateRoute>
+                }
+              />
               <Route
                 path="/calendar"
                 element={

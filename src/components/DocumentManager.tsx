@@ -30,6 +30,10 @@ const documentTypes = [
     { value: 'service', label: 'Service Invoice' },
     { value: 'ownership', label: 'Ownership / Title' },
     { value: 'warranty', label: 'Warranty' },
+    { value: 'permit', label: 'Business / fleet permit' },
+    { value: 'taxi_permit', label: 'Taxi permit' },
+    { value: 'contract', label: 'Contract' },
+    { value: 'invoice', label: 'Invoice' },
     { value: 'other', label: 'Other' },
 ];
 

@@ -10,19 +10,106 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function ownsVehicle(vehicleId) {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/vehicles/$(vehicleId))
-        && get(/databases/$(database)/documents/vehicles/$(vehicleId)).data.userId == request.auth.uid;
-    }
-
-    function vehicleOwnerUnchanged() {
-      return !('userId' in request.resource.data)
-        || request.resource.data.userId == resource.data.userId;
+    function signedEmail() {
+      return request.auth.token.email;
     }
 
     function hasOnly(keys) {
       return request.resource.data.keys().hasOnly(keys);
+    }
+
+    function memberPath(orgId, uid) {
+      return /databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid);
+    }
+
+    function invitePath(orgId, email) {
+      return /databases/$(database)/documents/organizationInvites/$(orgId + '_' + email);
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn()
+        && exists(memberPath(orgId, request.auth.uid))
+        && get(memberPath(orgId, request.auth.uid)).data.status == 'active';
+    }
+
+    function orgRole(orgId) {
+      return get(memberPath(orgId, request.auth.uid)).data.role;
+    }
+
+    function canViewOrg(orgId) {
+      return isOrgMember(orgId);
+    }
+
+    function canDriverOrg(orgId) {
+      return isOrgMember(orgId)
+        && orgRole(orgId) in ['owner', 'admin', 'manager', 'driver'];
+    }
+
+    function canEditOrg(orgId) {
+      return isOrgMember(orgId)
+        && orgRole(orgId) in ['owner', 'admin', 'manager'];
+    }
+
+    function canManageOrg(orgId) {
+      return isOrgMember(orgId)
+        && orgRole(orgId) in ['owner', 'admin'];
+    }
+
+    function canOwnNewOrganization(orgId) {
+      return isSignedIn()
+        && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.createdBy == request.auth.uid;
+    }
+
+    function canAcceptInvite(orgId, role) {
+      return isSignedIn()
+        && exists(invitePath(orgId, signedEmail()))
+        && get(invitePath(orgId, signedEmail())).data.email == signedEmail()
+        && get(invitePath(orgId, signedEmail())).data.organizationId == orgId
+        && get(invitePath(orgId, signedEmail())).data.role == role
+        && get(invitePath(orgId, signedEmail())).data.status == 'pending';
+    }
+
+    function isPersonalVehicleData(data) {
+      return !('ownerType' in data) || data.ownerType == 'personal';
+    }
+
+    function canReadVehicleData(data) {
+      return (isPersonalVehicleData(data) && isOwner(data.userId))
+        || (data.ownerType == 'organization' && canViewOrg(data.ownerId));
+    }
+
+    function canEditVehicleData(data) {
+      return (isPersonalVehicleData(data) && isOwner(data.userId))
+        || (data.ownerType == 'organization' && canEditOrg(data.ownerId));
+    }
+
+    function canDriverVehicleData(data) {
+      return (isPersonalVehicleData(data) && isOwner(data.userId))
+        || (data.ownerType == 'organization' && canDriverOrg(data.ownerId));
+    }
+
+    function ownsVehicle(vehicleId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/vehicles/$(vehicleId))
+        && canReadVehicleData(get(/databases/$(database)/documents/vehicles/$(vehicleId)).data);
+    }
+
+    function canEditVehicle(vehicleId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/vehicles/$(vehicleId))
+        && canEditVehicleData(get(/databases/$(database)/documents/vehicles/$(vehicleId)).data);
+    }
+
+    function canDriverVehicle(vehicleId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/vehicles/$(vehicleId))
+        && canDriverVehicleData(get(/databases/$(database)/documents/vehicles/$(vehicleId)).data);
+    }
+
+    function vehicleOwnerUnchanged() {
+      return (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+        && (!('ownerType' in request.resource.data) || request.resource.data.ownerType == resource.data.ownerType)
+        && (!('ownerId' in request.resource.data) || request.resource.data.ownerId == resource.data.ownerId);
     }
 
     function validLinkedSourceCreate() {
@@ -35,46 +122,146 @@ service cloud.firestore {
         || resource.data.sourceType == 'service';
     }
 
+    match /organizations/{orgId} {
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow read: if canViewOrg(orgId);
+      allow update: if canManageOrg(orgId);
+      allow delete: if isOrgMember(orgId) && orgRole(orgId) == 'owner';
+
+      match /businessSettings/{settingId} {
+        allow read: if canViewOrg(orgId);
+        allow create, update: if request.resource.data.keys().hasOnly(['defaultReminderLeadTimeDays', 'inspectionFailureCreatesWorkOrder', 'preferredCurrency', 'createdAt', 'updatedAt'])
+          && (canManageOrg(orgId) || canOwnNewOrganization(orgId));
+        allow delete: if canManageOrg(orgId);
+      }
+
+      match /vendors/{vendorId} {
+        allow read: if canViewOrg(orgId);
+        allow create, update, delete: if canEditOrg(orgId)
+          && request.resource.data.organizationId == orgId;
+      }
+    }
+
+    match /organizationMembers/{memberId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || canViewOrg(resource.data.organizationId));
+      allow create: if isSignedIn()
+        && memberId == request.resource.data.organizationId + '_' + request.resource.data.userId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'active'
+        && (
+          (request.resource.data.role == 'owner' && canOwnNewOrganization(request.resource.data.organizationId))
+          || canAcceptInvite(request.resource.data.organizationId, request.resource.data.role)
+        );
+      allow update: if canManageOrg(resource.data.organizationId)
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if canManageOrg(resource.data.organizationId);
+    }
+
+    match /organizationInvites/{inviteId} {
+      allow create: if canManageOrg(request.resource.data.organizationId)
+        && inviteId == request.resource.data.organizationId + '_' + request.resource.data.email
+        && request.resource.data.status == 'pending';
+      allow read: if canManageOrg(resource.data.organizationId)
+        || (isSignedIn() && resource.data.email == signedEmail());
+      allow update: if canManageOrg(resource.data.organizationId)
+        || (isSignedIn()
+          && resource.data.email == signedEmail()
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.organizationId == resource.data.organizationId
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role);
+      allow delete: if canManageOrg(resource.data.organizationId);
+    }
+
     match /vehicles/{vehicleId} {
-      allow create: if isOwner(request.resource.data.userId);
-      allow read: if isOwner(resource.data.userId);
+      allow create: if (
+          request.resource.data.ownerType == 'organization'
+          && request.resource.data.ownerId == request.resource.data.organizationId
+          && canEditOrg(request.resource.data.ownerId)
+          && request.resource.data.createdBy == request.auth.uid
+        ) || (
+          isPersonalVehicleData(request.resource.data)
+          && isOwner(request.resource.data.userId)
+        );
+      allow read: if canReadVehicleData(resource.data);
       allow delete: if false;
-      allow update: if isOwner(resource.data.userId) && vehicleOwnerUnchanged();
+      allow update: if canEditVehicleData(resource.data) && vehicleOwnerUnchanged();
 
       match /services/{serviceId} {
-        allow read, delete: if ownsVehicle(vehicleId);
-        allow create: if ownsVehicle(vehicleId)
+        allow read: if ownsVehicle(vehicleId);
+        allow delete: if canEditVehicle(vehicleId);
+        allow create: if canDriverVehicle(vehicleId)
           && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid);
-        allow update: if ownsVehicle(vehicleId)
+        allow update: if canEditVehicle(vehicleId)
           && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid);
       }
 
       match /expenses/{expenseId} {
         allow read: if ownsVehicle(vehicleId);
-        allow delete: if ownsVehicle(vehicleId) && canDeleteClientExpense();
-        allow create: if ownsVehicle(vehicleId)
+        allow delete: if canEditVehicle(vehicleId) && canDeleteClientExpense();
+        allow create: if canDriverVehicle(vehicleId)
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.vehicleId == vehicleId
           && validLinkedSourceCreate()
-          && hasOnly(['userId', 'vehicleId', 'category', 'amount', 'date', 'notes', 'sourceType', 'sourceId', 'sourceLabel', 'createdAt']);
+          && request.resource.data.keys().hasOnly(['userId', 'vehicleId', 'category', 'amount', 'date', 'notes', 'sourceType', 'sourceId', 'sourceLabel', 'createdAt']);
         allow update: if false;
       }
 
       match /documents/{documentId} {
         allow read: if ownsVehicle(vehicleId);
-        allow delete: if ownsVehicle(vehicleId)
+        allow delete: if canEditVehicle(vehicleId)
           && (!('storageProvider' in resource.data) || resource.data.storageProvider != 'r2');
         allow create, update: if false;
+      }
+
+      match /inspections/{inspectionId} {
+        allow read: if ownsVehicle(vehicleId);
+        allow create: if canDriverVehicle(vehicleId)
+          && request.resource.data.vehicleId == vehicleId;
+        allow update, delete: if canEditVehicle(vehicleId);
+      }
+
+      match /issues/{issueId} {
+        allow read: if ownsVehicle(vehicleId);
+        allow create: if canDriverVehicle(vehicleId)
+          && request.resource.data.vehicleId == vehicleId;
+        allow update, delete: if canEditVehicle(vehicleId);
+      }
+
+      match /workOrders/{workOrderId} {
+        allow read: if ownsVehicle(vehicleId);
+        allow create, update, delete: if canEditVehicle(vehicleId)
+          && request.resource.data.vehicleId == vehicleId;
       }
     }
 
     match /reminders/{reminderId} {
-      allow create: if isOwner(request.resource.data.userId)
-        && ownsVehicle(request.resource.data.vehicleId);
-      allow read, delete: if isOwner(resource.data.userId);
-      allow update: if isOwner(resource.data.userId)
-        && request.resource.data.userId == resource.data.userId
-        && request.resource.data.vehicleId == resource.data.vehicleId;
+      allow create: if (
+          request.resource.data.ownerType == 'organization'
+          && canDriverOrg(request.resource.data.ownerId)
+          && canDriverVehicle(request.resource.data.vehicleId)
+        ) || (
+          isOwner(request.resource.data.userId)
+          && canDriverVehicle(request.resource.data.vehicleId)
+        );
+      allow read, delete: if (
+          resource.data.ownerType == 'organization'
+          && canViewOrg(resource.data.ownerId)
+        ) || isOwner(resource.data.userId);
+      allow update: if (
+          resource.data.ownerType == 'organization'
+          && canDriverOrg(resource.data.ownerId)
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.resource.data.vehicleId == resource.data.vehicleId
+        ) || (
+          isOwner(resource.data.userId)
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.vehicleId == resource.data.vehicleId
+        );
     }
 
     match /users/{userId} {

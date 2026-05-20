@@ -120,7 +120,8 @@ export const ProfileSettings = () => {
             const remindersSnapshot = await getDocs(query(collection(db, 'reminders'), where('userId', '==', user.uid)));
             const notificationsSnapshot = await getDocs(collection(db, 'users', user.uid, 'notifications'));
 
-            const vehicles = await Promise.all(vehiclesSnapshot.docs.map(async (vehicleDoc) => {
+            const personalVehicleDocs = vehiclesSnapshot.docs.filter((vehicleDoc) => vehicleDoc.data().ownerType !== 'organization');
+            const vehicles = await Promise.all(personalVehicleDocs.map(async (vehicleDoc) => {
                 const vehicle = { id: vehicleDoc.id, ...vehicleDoc.data() };
                 const [services, expenses, documents] = await Promise.all([
                     getDocs(collection(db, 'vehicles', vehicleDoc.id, 'services')),
@@ -150,7 +151,9 @@ export const ProfileSettings = () => {
                     hostingAndFunctions: 'Netlify',
                 },
                 vehicles,
-                reminders: remindersSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+                reminders: remindersSnapshot.docs
+                    .map((doc) => ({ id: doc.id, ...doc.data() }))
+                    .filter((reminder) => (reminder as { ownerType?: string }).ownerType !== 'organization'),
                 notifications: notificationsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
             });
             setMessage('Your export was prepared. Private file binaries are not included; document metadata is included.');

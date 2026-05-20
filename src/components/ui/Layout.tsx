@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     Bell,
+    Building2,
     Car,
     CalendarDays,
     LayoutDashboard,
@@ -102,6 +103,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
     const navItems = [
         { icon: LayoutDashboard, label: t('Dashboard'), href: '/app' },
+        { icon: Building2, label: 'Business', href: '/business' },
         { icon: CalendarDays, label: t('Calendar'), href: '/calendar' },
         { icon: User, label: t('Profile'), href: '/profile' },
     ];
@@ -126,7 +128,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                                     icon={item.icon}
                                     label={item.label}
                                     href={item.href}
-                                    isActive={location.pathname === item.href}
+                                    isActive={item.href === '/business' ? location.pathname.startsWith('/business') : location.pathname === item.href}
                                 />
                             ))}
                         </nav>
@@ -200,6 +202,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
             <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-end justify-around border-t border-border/80 bg-card/95 px-2 py-2 pb-safe backdrop-blur-xl md:hidden">
                 <MobileNavItem icon={LayoutDashboard} label="Paneli" href="/app" isActive={location.pathname === '/app'} />
+                <MobileNavItem icon={Building2} label="Biznes" href="/business" isActive={location.pathname.startsWith('/business')} />
                 <MobileNavItem icon={Car} label="Garazhi" href="/app" isActive={location.pathname.startsWith('/vehicle')} />
                 <Link
                     to="/app"
