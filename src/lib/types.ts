@@ -81,7 +81,7 @@ export interface Reminder {
 }
 
 export interface UserPreferences {
-    language: 'sq' | 'en' | 'it';
+    language: 'sq' | 'en' | 'it' | 'de' | 'es';
     timezone: string;
     defaultReminderLeadTimeDays: number;
     browserNotificationsEnabled: boolean;

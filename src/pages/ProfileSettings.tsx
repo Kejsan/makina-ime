@@ -5,13 +5,14 @@ import i18n from '../i18n';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Layout } from '../components/ui/Layout';
+import { PwaInstallButton } from '../components/PwaInstallButton';
 import { AppSurface, PageHeader, Panel } from '../components/ui/design-system';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import type { UserPreferences } from '../lib/types';
 
 const defaultPreferences = (): UserPreferences => ({
-    language: 'sq',
+    language: (i18n.language?.slice(0, 2) as UserPreferences['language']) || 'sq',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Tirane',
     defaultReminderLeadTimeDays: 14,
     browserNotificationsEnabled: false,
@@ -88,6 +89,7 @@ export const ProfileSettings = () => {
                 ...preferences,
                 updatedAt: serverTimestamp(),
             }, { merge: true });
+            window.localStorage.setItem('makina-ime-language', preferences.language);
             await i18n.changeLanguage(preferences.language);
             setMessage('Preferences saved.');
         } catch {
@@ -216,6 +218,8 @@ export const ProfileSettings = () => {
                                     <option value="sq">Shqip</option>
                                     <option value="en">English</option>
                                     <option value="it">Italiano</option>
+                                    <option value="de">Deutsch</option>
+                                    <option value="es">Español</option>
                                 </select>
                             </div>
                             <div className="space-y-2">
@@ -260,6 +264,9 @@ export const ProfileSettings = () => {
                             </label>
                         </div>
                         <Button className="mt-4" onClick={savePreferences} isLoading={savingPreferences}>Save preferences</Button>
+                        <div className="mt-3">
+                            <PwaInstallButton />
+                        </div>
                     </AppSurface>
 
                     <AppSurface className="p-5">

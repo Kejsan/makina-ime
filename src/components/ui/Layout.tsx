@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebase';
 import { cn } from '../../lib/utils';
 import { NotificationCenter } from '../NotificationCenter';
+import { PwaInstallButton } from '../PwaInstallButton';
 import { ThemeToggle } from './design-system';
 import logo from '../../assets/Makina Ime Logo.png';
 
@@ -148,6 +149,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         </div>
 
                         <div className="flex items-center justify-between gap-2">
+                            <PwaInstallButton compact />
                             <ThemeToggle />
                             <button
                                 type="button"
@@ -172,6 +174,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                             <img src={logo} alt="Makina Ime" className="h-8 w-auto object-contain" />
                         </Link>
                         <div className="flex items-center gap-2">
+                            <PwaInstallButton compact />
                             <ThemeToggle className="h-9 w-9" />
                             <div className="relative">
                                 <button
