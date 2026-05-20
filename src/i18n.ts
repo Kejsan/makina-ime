@@ -23,6 +23,8 @@ i18n
         lng: detectBrowserLanguage(),
         fallbackLng: "en",
         supportedLngs: supportedLanguages,
+        keySeparator: false,
+        nsSeparator: false,
         interpolation: {
             escapeValue: false
         },

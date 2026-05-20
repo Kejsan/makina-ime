@@ -2,6 +2,7 @@ import type React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
 import { AppSurface, StatusPill, ThemeToggle } from '../components/ui/design-system';
+import { PwaInstallButton } from '../components/PwaInstallButton';
 import logo from '../assets/Makina Ime Logo.png';
 
 const updatedAt = '20 May 2026';
@@ -44,6 +45,7 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' | 'cookies' }) =
                         <img src={logo} alt="Makina Ime" className="h-9 w-auto" />
                     </Link>
                     <div className="flex items-center gap-2">
+                        <PwaInstallButton compact />
                         <ThemeToggle />
                         <Link to="/auth" className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground">
                             Sign in

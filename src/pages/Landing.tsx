@@ -16,6 +16,7 @@ import {
     Wrench,
 } from 'lucide-react';
 import { AppSurface, Panel, StatusPill, ThemeToggle } from '../components/ui/design-system';
+import { PwaInstallButton } from '../components/PwaInstallButton';
 import logo from '../assets/Makina Ime Logo.png';
 
 const personalFeatures = [
@@ -65,6 +66,7 @@ export const Landing = () => {
                         <a href="#faq" className="hover:text-foreground">FAQ</a>
                     </nav>
                     <div className="flex items-center gap-2">
+                        <PwaInstallButton compact autoOffer />
                         <ThemeToggle />
                         <Link to="/auth" className="hidden h-10 items-center justify-center rounded-xl border border-input bg-background/70 px-4 text-sm font-semibold hover:bg-accent sm:inline-flex">
                             Sign in

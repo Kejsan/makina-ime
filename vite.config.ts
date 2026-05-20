@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.png', 'apple-touch-icon.png', 'pwa-192x192.png'],
       workbox: {
         globIgnores: ['**/ocr-*.js', '**/vendor-ocr-*.js', '**/pdf.worker-*.mjs']
       },
@@ -25,6 +25,11 @@ export default defineConfig({
         categories: ['utilities', 'productivity', 'finance'],
         icons: [
           {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
             src: 'icon.png',
             sizes: '512x512',
             type: 'image/png'
@@ -33,7 +38,7 @@ export default defineConfig({
             src: 'icon.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'maskable'
+            purpose: 'any maskable'
           }
         ]
       }

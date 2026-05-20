@@ -14,10 +14,18 @@ const isRunningStandalone = () => {
     return window.matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
 };
 
-export const PwaInstallButton = ({ compact = false }: { compact?: boolean }) => {
+const isMobileBrowser = () => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 767px)').matches || /android|iphone|ipad|ipod/i.test(window.navigator.userAgent);
+};
+
+const installOfferStorageKey = 'makina-ime-install-offer-dismissed';
+
+export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compact?: boolean; autoOffer?: boolean }) => {
     const { t } = useTranslation();
     const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [showInstructions, setShowInstructions] = useState(false);
+    const [showOffer, setShowOffer] = useState(false);
     const [installed, setInstalled] = useState(isRunningStandalone);
 
     const isIos = useMemo(() => {
@@ -43,9 +51,19 @@ export const PwaInstallButton = ({ compact = false }: { compact?: boolean }) => 
         };
     }, [installed]);
 
+    useEffect(() => {
+        if (!autoOffer || installed || !isMobileBrowser()) return;
+        if (window.localStorage.getItem(installOfferStorageKey) === 'true') return;
+
+        const timeout = window.setTimeout(() => setShowOffer(true), 1200);
+        return () => window.clearTimeout(timeout);
+    }, [autoOffer, installed]);
+
     if (installed) return null;
 
     const startInstall = async () => {
+        setShowOffer(false);
+
         if (installPrompt) {
             await installPrompt.prompt();
             await installPrompt.userChoice;
@@ -56,12 +74,46 @@ export const PwaInstallButton = ({ compact = false }: { compact?: boolean }) => 
         setShowInstructions(true);
     };
 
+    const dismissOffer = () => {
+        window.localStorage.setItem(installOfferStorageKey, 'true');
+        setShowOffer(false);
+    };
+
     return (
         <>
             <Button type="button" variant="outline" size={compact ? 'icon' : 'sm'} onClick={startInstall} title={t('Install App')} aria-label={t('Install App')}>
                 <Download className={compact ? 'h-4 w-4' : 'mr-2 h-4 w-4'} />
                 {!compact && t('Install App')}
             </Button>
+
+            {showOffer && (
+                <div className="fixed inset-x-3 bottom-4 z-50 md:hidden">
+                    <AppSurface className="border-primary/30 p-4 shadow-2xl">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                <Download className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h2 className="text-sm font-bold">{t('Install Makina Ime')}</h2>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                    {t('Install this app on your phone for faster access and PWA reminders.')}
+                                </p>
+                                <div className="mt-3 flex gap-2">
+                                    <Button type="button" size="sm" className="h-9 flex-1" onClick={startInstall}>
+                                        {t('Install App')}
+                                    </Button>
+                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={dismissOffer}>
+                                        {t('Not now')}
+                                    </Button>
+                                </div>
+                            </div>
+                            <button type="button" className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground" onClick={dismissOffer} aria-label={t('Close')} title={t('Close')}>
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </AppSurface>
+                </div>
+            )}
 
             {showInstructions && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">

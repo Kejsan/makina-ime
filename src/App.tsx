@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LocalizedDom } from './components/LocalizedDom';
 import { ThemeProvider } from './context/ThemeContext';
 import './i18n';
 
@@ -37,6 +38,7 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <Router>
+          <LocalizedDom />
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/" element={<Landing />} />
