@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, Timestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, Timestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Card } from './ui/Card';
-import { DollarSign, Calendar, Trash2, Plus, Tag } from 'lucide-react';
+import { DollarSign, Calendar, Trash2, Plus, Tag, Pencil } from 'lucide-react';
 import type { ExpenseRecord } from '../lib/types';
 
 export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
     const { user } = useAuth();
     const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
+    const [formError, setFormError] = useState('');
     const [showForm, setShowForm] = useState(false);
+    const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
     
     // Form
     const [category, setCategory] = useState('Fuel');
@@ -22,38 +25,107 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
 
     const categories = ['Fuel', 'Insurance', 'Tax', 'Parking', 'Tolls', 'Cleaning', 'Maintenance', 'Document', 'Other'];
 
+    const canEditExpense = (expense: ExpenseRecord) => !expense.sourceType || expense.sourceType === 'manual';
+
+    const formatDateInput = (expenseDate?: Timestamp) => {
+        const dateValue = expenseDate?.toDate?.();
+        if (!dateValue) return '';
+        return dateValue.toISOString().slice(0, 10);
+    };
+
+    const resetForm = () => {
+        setEditingExpense(null);
+        setCategory('Fuel');
+        setAmount('');
+        setDate('');
+        setNotes('');
+        setFormError('');
+    };
+
+    const openCreateForm = () => {
+        if (showForm && !editingExpense) {
+            setShowForm(false);
+            resetForm();
+            return;
+        }
+
+        resetForm();
+        setShowForm(true);
+    };
+
+    const openEditForm = (expense: ExpenseRecord) => {
+        if (!canEditExpense(expense)) {
+            setFormError('Linked expenses must be edited from the related service or document.');
+            return;
+        }
+
+        setEditingExpense(expense);
+        setCategory(expense.category || 'Fuel');
+        setAmount(String(expense.amount || ''));
+        setDate(formatDateInput(expense.date));
+        setNotes(expense.notes || '');
+        setFormError('');
+        setShowForm(true);
+    };
+
+    const closeForm = () => {
+        setShowForm(false);
+        resetForm();
+    };
+
     useEffect(() => {
         const q = query(
             collection(db, 'vehicles', vehicleId, 'expenses'),
             orderBy('date', 'desc')
         );
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseRecord)));
+            setExpenses(snapshot.docs.map(snapshotDoc => ({ id: snapshotDoc.id, vehicleId, ...snapshotDoc.data() } as ExpenseRecord)));
+            setLoading(false);
+            setLoadError('');
+        }, (error) => {
+            console.error('Expense listener failed', error);
+            setLoadError('Expenses could not be loaded. Please check your account permissions and try again.');
             setLoading(false);
         });
         return unsubscribe;
     }, [vehicleId]);
 
-    const handleAddExpense = async (e: React.FormEvent) => {
+    const handleSaveExpense = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
+
         try {
-            await addDoc(collection(db, 'vehicles', vehicleId, 'expenses'), {
-                userId: user.uid,
-                vehicleId,
+            setFormError('');
+            const payload = {
                 category,
                 amount: parseFloat(amount),
                 date: Timestamp.fromDate(new Date(date)),
-                notes,
-                sourceType: 'manual',
-                createdAt: Timestamp.now()
-            });
-            setShowForm(false);
-            setAmount('');
-            setDate('');
-            setNotes('');
+                notes: notes.trim(),
+            };
+
+            if (editingExpense) {
+                if (!canEditExpense(editingExpense)) {
+                    setFormError('Linked expenses must be edited from the related service or document.');
+                    return;
+                }
+
+                await updateDoc(doc(db, 'vehicles', vehicleId, 'expenses', editingExpense.id), {
+                    ...payload,
+                    updatedAt: Timestamp.now(),
+                });
+            } else {
+                await addDoc(collection(db, 'vehicles', vehicleId, 'expenses'), {
+                    userId: user.uid,
+                    vehicleId,
+                    ...payload,
+                    sourceType: 'manual',
+                    createdAt: Timestamp.now()
+                });
+            }
+
+            closeForm();
         } catch {
-            console.error('Expense creation failed');
+            setFormError(editingExpense ? 'Expense update failed. Please try again.' : 'Expense creation failed. Please try again.');
         }
     };
 
@@ -92,15 +164,27 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
 
             <div className="flex justify-between items-center">
                 <h3 className="text-xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">Expense Log</h3>
-                <Button onClick={() => setShowForm(!showForm)} variant="outline">
+                <Button onClick={openCreateForm} variant="outline">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Expense
                 </Button>
             </div>
 
+            {loadError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                    {loadError}
+                </div>
+            )}
+
             {showForm && (
                 <Card className="p-6 border-primary/20 animate-in fade-in slide-in-from-top-2 bg-surface/50 backdrop-blur-sm">
-                    <form onSubmit={handleAddExpense} className="space-y-4">
+                    <form onSubmit={handleSaveExpense} className="space-y-4">
+                        <h4 className="font-bold">{editingExpense ? 'Edit Expense' : 'Add Expense'}</h4>
+                        {formError && (
+                            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                                {formError}
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium ml-1">Category</label>
@@ -137,8 +221,8 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                             />
                         </div>
                         <div className="flex justify-end gap-2 pt-2">
-                            <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
-                            <Button type="submit">Save Expense</Button>
+                            <Button type="button" variant="ghost" onClick={closeForm}>Cancel</Button>
+                            <Button type="submit">{editingExpense ? 'Update Expense' : 'Save Expense'}</Button>
                         </div>
                     </form>
                 </Card>
@@ -183,6 +267,15 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <span className="font-bold text-lg font-mono">€{expense.amount.toFixed(2)}</span>
+                                    {canEditExpense(expense) && (
+                                        <button
+                                            onClick={() => openEditForm(expense)}
+                                            className="text-muted-foreground hover:text-primary transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-primary/10 rounded-lg"
+                                            title="Edit Expense"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={() => handleDeleteClick(expense)} 
                                         className="text-muted-foreground hover:text-destructive transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"

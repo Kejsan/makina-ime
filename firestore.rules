@@ -122,6 +122,16 @@ service cloud.firestore {
         || resource.data.sourceType == 'service';
     }
 
+    function canUpdateManualExpense(vehicleId) {
+      return canEditVehicle(vehicleId)
+        && (!('sourceType' in resource.data) || resource.data.sourceType == 'manual')
+        && (!('userId' in resource.data) || request.resource.data.userId == resource.data.userId)
+        && (!('vehicleId' in resource.data) || resource.data.vehicleId == vehicleId)
+        && (!('vehicleId' in request.resource.data) || request.resource.data.vehicleId == vehicleId)
+        && (!('sourceType' in request.resource.data) || request.resource.data.sourceType == 'manual')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['category', 'amount', 'date', 'notes', 'updatedAt']);
+    }
+
     match /organizations/{orgId} {
       allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid;
@@ -208,7 +218,7 @@ service cloud.firestore {
           && request.resource.data.vehicleId == vehicleId
           && validLinkedSourceCreate()
           && request.resource.data.keys().hasOnly(['userId', 'vehicleId', 'category', 'amount', 'date', 'notes', 'sourceType', 'sourceId', 'sourceLabel', 'createdAt']);
-        allow update: if false;
+        allow update: if canUpdateManualExpense(vehicleId);
       }
 
       match /documents/{documentId} {

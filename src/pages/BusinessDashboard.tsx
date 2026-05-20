@@ -162,20 +162,27 @@ export const BusinessDashboard = () => {
             onSnapshot(collection(db, 'vehicles', vehicle.id, 'expenses'), (snapshot) => {
                 setExpensesByVehicle((previous) => ({
                     ...previous,
-                    [vehicle.id]: snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as ExpenseRecord)),
+                    [vehicle.id]: snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, vehicleId: vehicle.id, ...snapshotDoc.data() } as ExpenseRecord)),
                 }));
+            }, (error) => {
+                console.error('Fleet expense listener failed', error);
+                setMessage('Fleet expenses could not be loaded. Please check your workspace permissions.');
             }),
             onSnapshot(collection(db, 'vehicles', vehicle.id, 'issues'), (snapshot) => {
                 setIssuesByVehicle((previous) => ({
                     ...previous,
                     [vehicle.id]: snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as VehicleIssue)),
                 }));
+            }, (error) => {
+                console.error('Fleet issue listener failed', error);
             }),
             onSnapshot(collection(db, 'vehicles', vehicle.id, 'workOrders'), (snapshot) => {
                 setWorkOrdersByVehicle((previous) => ({
                     ...previous,
                     [vehicle.id]: snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as WorkOrder)),
                 }));
+            }, (error) => {
+                console.error('Fleet work order listener failed', error);
             }),
         ]);
 

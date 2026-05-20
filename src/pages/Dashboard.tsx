@@ -7,13 +7,14 @@ import {
     DollarSign,
     FileText,
     Filter,
+    Pencil,
     Plus,
     ShieldAlert,
     Trash2,
     Wrench,
     X,
 } from 'lucide-react';
-import { addDoc, collection, onSnapshot, orderBy, query, Timestamp, where } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -56,6 +57,15 @@ const daysUntil = (date: Date) => {
     return Math.ceil((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 };
 
+const canEditExpense = (expense: ExpenseRecord) => !expense.sourceType || expense.sourceType === 'manual';
+
+const formatDateInput = (timestamp?: Timestamp) => {
+    const value = timestamp?.toDate?.();
+    return value ? value.toISOString().slice(0, 10) : '';
+};
+
+const expenseCategories = ['Fuel', 'Insurance', 'Tax', 'Parking', 'Tolls', 'Cleaning', 'Maintenance', 'Document', 'Other'];
+
 export const Dashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -66,6 +76,9 @@ export const Dashboard = () => {
     const [selectedVehicleFilter, setSelectedVehicleFilter] = useState('all');
     const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
     const [deleteError, setDeleteError] = useState('');
+    const [expenseLoadError, setExpenseLoadError] = useState('');
+    const [expenseSaveError, setExpenseSaveError] = useState('');
+    const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
 
     const [make, setMake] = useState('');
     const [model, setModel] = useState('');
@@ -82,6 +95,12 @@ export const Dashboard = () => {
     const [tplInsuranceExpiry, setTplInsuranceExpiry] = useState('');
     const [roadTaxExpiry, setRoadTaxExpiry] = useState('');
     const [tintedGlassCertificateExpiry, setTintedGlassCertificateExpiry] = useState('');
+    const [expenseForm, setExpenseForm] = useState({
+        category: 'Fuel',
+        amount: '',
+        date: '',
+        notes: '',
+    });
 
     useEffect(() => {
         if (!user) return;
@@ -91,6 +110,11 @@ export const Dashboard = () => {
             setVehicles(snapshot.docs
                 .map((doc) => ({ id: doc.id, ...doc.data() } as Vehicle))
                 .filter((vehicle) => vehicle.ownerType !== 'organization'));
+            setLoading(false);
+            setDeleteError('');
+        }, (error) => {
+            console.error('Vehicle listener failed', error);
+            setDeleteError('Vehicles could not be loaded. Please check your account permissions and try again.');
             setLoading(false);
         });
 
@@ -107,8 +131,12 @@ export const Dashboard = () => {
             return onSnapshot(q, (snapshot) => {
                 setExpensesByVehicle((previous) => ({
                     ...previous,
-                    [vehicle.id]: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ExpenseRecord)),
+                    [vehicle.id]: snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, vehicleId: vehicle.id, ...snapshotDoc.data() } as ExpenseRecord)),
                 }));
+                setExpenseLoadError('');
+            }, (error) => {
+                console.error('Expense listener failed', error);
+                setExpenseLoadError('Expenses could not be loaded. Please check your account permissions and try again.');
             });
         });
 
@@ -123,6 +151,8 @@ export const Dashboard = () => {
             setReminders(snapshot.docs
                 .map((doc) => ({ id: doc.id, ...doc.data() } as Reminder))
                 .filter((reminder) => reminder.ownerType !== 'organization'));
+        }, (error) => {
+            console.error('Reminder listener failed', error);
         });
 
         return unsubscribe;
@@ -188,6 +218,52 @@ export const Dashboard = () => {
             } catch {
                 setDeleteError('Vehicle deletion failed. Please try again.');
             }
+        }
+    };
+
+    const openExpenseEditor = (expense: ExpenseRecord) => {
+        if (!canEditExpense(expense)) {
+            setExpenseSaveError('Linked expenses must be edited from the related service or document.');
+            return;
+        }
+
+        setEditingExpense(expense);
+        setExpenseForm({
+            category: expense.category || 'Fuel',
+            amount: String(expense.amount || ''),
+            date: formatDateInput(expense.date),
+            notes: expense.notes || '',
+        });
+        setExpenseSaveError('');
+    };
+
+    const closeExpenseEditor = () => {
+        setEditingExpense(null);
+        setExpenseSaveError('');
+        setExpenseForm({
+            category: 'Fuel',
+            amount: '',
+            date: '',
+            notes: '',
+        });
+    };
+
+    const handleUpdateExpense = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!editingExpense || !canEditExpense(editingExpense)) return;
+
+        try {
+            setExpenseSaveError('');
+            await updateDoc(doc(db, 'vehicles', editingExpense.vehicleId, 'expenses', editingExpense.id), {
+                category: expenseForm.category,
+                amount: parseFloat(expenseForm.amount),
+                date: Timestamp.fromDate(new Date(expenseForm.date)),
+                notes: expenseForm.notes.trim(),
+                updatedAt: Timestamp.now(),
+            });
+            closeExpenseEditor();
+        } catch {
+            setExpenseSaveError('Expense update failed. Please try again.');
         }
     };
 
@@ -457,6 +533,12 @@ export const Dashboard = () => {
                         </div>
                     </div>
 
+                    {expenseLoadError && (
+                        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                            {expenseLoadError}
+                        </div>
+                    )}
+
                     <AppSurface className="overflow-hidden p-0">
                         {filteredExpenses.length === 0 ? (
                             <EmptyState icon={DollarSign} title="No costs recorded" description="Costs from service records, documents, and manual expenses will appear here." />
@@ -470,6 +552,7 @@ export const Dashboard = () => {
                                             <th className="px-5 py-4 font-semibold">Notes</th>
                                             <th className="px-5 py-4 font-semibold">Date</th>
                                             <th className="px-5 py-4 text-right font-semibold">Amount</th>
+                                            <th className="px-5 py-4 text-right font-semibold">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/60">
@@ -480,6 +563,20 @@ export const Dashboard = () => {
                                                 <td className="max-w-xs truncate px-5 py-4 text-muted-foreground">{expense.notes || expense.sourceLabel || '-'}</td>
                                                 <td className="px-5 py-4 font-mono text-xs text-muted-foreground">{expense.date?.toDate?.().toLocaleDateString() || '-'}</td>
                                                 <td className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{formatCurrency(expense.amount || 0)}</td>
+                                                <td className="px-5 py-4 text-right">
+                                                    {canEditExpense(expense) ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openExpenseEditor(expense)}
+                                                            className="inline-flex rounded-lg p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                                                            title="Edit Expense"
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">Linked</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -555,6 +652,72 @@ export const Dashboard = () => {
                             <div className="flex flex-col gap-2 pt-2 sm:flex-row">
                                 <Button type="submit" className="h-11 flex-1 rounded-xl font-bold">Shto automjet</Button>
                                 <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => setIsVehicleModalOpen(false)}>Anulo</Button>
+                            </div>
+                        </form>
+                    </AppSurface>
+                </div>
+            )}
+
+            {editingExpense && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                    <AppSurface className="w-full max-w-lg p-6 shadow-2xl">
+                        <div className="mb-6 flex items-start justify-between gap-4">
+                            <div>
+                                <h2 className="flex items-center gap-2 text-xl font-bold">
+                                    <Pencil className="h-5 w-5 text-primary" />
+                                    Edit Expense
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">{getVehicleName(editingExpense.vehicleId)}</p>
+                            </div>
+                            <button type="button" onClick={closeExpenseEditor} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleUpdateExpense} className="space-y-4">
+                            {expenseSaveError && (
+                                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                                    {expenseSaveError}
+                                </div>
+                            )}
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <label className="mi-label">Category</label>
+                                    <select
+                                        className="mi-field"
+                                        value={expenseForm.category}
+                                        onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })}
+                                    >
+                                        {expenseCategories.map((categoryOption) => (
+                                            <option key={categoryOption} value={categoryOption}>{categoryOption}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <Input
+                                    label="Amount (€)"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={expenseForm.amount}
+                                    onChange={(event) => setExpenseForm({ ...expenseForm, amount: event.target.value })}
+                                    required
+                                />
+                                <Input
+                                    label="Date"
+                                    type="date"
+                                    value={expenseForm.date}
+                                    onChange={(event) => setExpenseForm({ ...expenseForm, date: event.target.value })}
+                                    required
+                                />
+                                <Input
+                                    label="Notes (Optional)"
+                                    value={expenseForm.notes}
+                                    onChange={(event) => setExpenseForm({ ...expenseForm, notes: event.target.value })}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-2 pt-2 sm:flex-row">
+                                <Button type="submit" className="h-11 flex-1 rounded-xl font-bold">Update Expense</Button>
+                                <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={closeExpenseEditor}>Cancel</Button>
                             </div>
                         </form>
                     </AppSurface>
