@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Building2, Car, Lock, Mail, ShieldCheck, Users } from 'lucide-react';
+import { Building2, Car, Eye, EyeOff, Lock, Mail, ShieldCheck, Users } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { AppSurface, Panel, StatusPill, ThemeToggle } from '../components/ui/design-system';
 import { PwaInstallButton } from '../components/PwaInstallButton';
 import { useAuth } from '../context/AuthContext';
@@ -11,7 +10,7 @@ import logo from '../assets/Makina Ime Logo.png';
 
 export const Auth = () => {
     const { t } = useTranslation();
-    const { signIn, signUp } = useAuth();
+    const { signIn, signUp, resetPassword } = useAuth();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -21,12 +20,16 @@ export const Auth = () => {
     const [isLogin, setIsLogin] = useState(initialMode);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [isResetMode, setIsResetMode] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setMessage('');
         setLoading(true);
 
         try {
@@ -46,6 +49,26 @@ export const Auth = () => {
         }
     };
 
+    const handlePasswordReset = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setError('');
+        setMessage('');
+        setLoading(true);
+
+        try {
+            await resetPassword(email);
+            setMessage(t('Password reset email sent. Check your inbox and spam folder.'));
+            setIsResetMode(false);
+        } catch (err: unknown) {
+            console.error('Password reset failed');
+            setError(err instanceof Error && err.message.includes('auth/')
+                ? t('Could not send a reset email. Check the email address and try again.')
+                : t('Password reset failed. Please try again.'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const setFlow = (nextType: 'personal' | 'business') => {
         setAccountType(nextType);
         setSearchParams({ type: nextType, mode: isLogin ? 'signin' : 'signup' });
@@ -54,6 +77,9 @@ export const Auth = () => {
     const toggleMode = () => {
         const nextIsLogin = !isLogin;
         setIsLogin(nextIsLogin);
+        setIsResetMode(false);
+        setError('');
+        setMessage('');
         setSearchParams({ type: accountType, mode: nextIsLogin ? 'signin' : 'signup' });
     };
 
@@ -95,7 +121,7 @@ export const Auth = () => {
                 </div>
             </header>
 
-            <main className="mx-auto grid max-w-6xl gap-8 px-4 py-8 md:grid-cols-[0.9fr_1fr] md:items-center md:py-14">
+            <main className="mx-auto grid max-w-6xl gap-8 px-4 py-8 lg:grid-cols-[0.85fr_1fr] lg:items-center lg:py-14">
                 <section className="space-y-6">
                     <StatusPill tone="amber">
                         <ShieldCheck className="h-3.5 w-3.5" />
@@ -135,47 +161,77 @@ export const Auth = () => {
                     </div>
                 </section>
 
-                <AppSurface className="p-6 sm:p-8">
+                <AppSurface className="p-5 sm:p-8">
                     <div className="mb-7">
-                        <p className="mi-label text-primary">{isLogin ? t('Sign in') : t('Register')}</p>
-                        <h2 className="mt-2 text-2xl font-bold tracking-tight">{flowCopy.formTitle}</h2>
-                        {!isLogin && accountType === 'business' && (
+                        <p className="mi-label text-primary">{isResetMode ? t('Password reset') : isLogin ? t('Sign in') : t('Register')}</p>
+                        <h2 className="mt-2 text-2xl font-bold tracking-tight">{isResetMode ? t('Reset your password') : flowCopy.formTitle}</h2>
+                        {isResetMode ? (
+                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                {t('Enter your account email and we will send a secure password reset link.')}
+                            </p>
+                        ) : !isLogin && accountType === 'business' && (
                             <p className="mt-2 text-sm leading-6 text-muted-foreground">
                                 {t('Next step after signup: create your organization, add vehicles, invite team members, and start fleet tracking.')}
                             </p>
                         )}
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form onSubmit={isResetMode ? handlePasswordReset : handleSubmit} className="space-y-5">
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <label className="mi-label">{t('Email')}</label>
-                                <div className="relative">
-                                    <Mail className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                                    <Input
+                                <div className="mi-field flex items-center gap-3 px-4">
+                                    <Mail className="h-5 w-5 shrink-0 text-muted-foreground" />
+                                    <input
                                         type="email"
                                         placeholder="name@example.com"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className="pl-10"
+                                        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                                         required
                                     />
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="mi-label">{t('Password')}</label>
-                                <div className="relative">
-                                    <Lock className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                                    <Input
-                                        type="password"
-                                        placeholder={t('Enter your password')}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="pl-10"
-                                        required
-                                    />
+                            {!isResetMode && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <label className="mi-label">{t('Password')}</label>
+                                        {isLogin && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsResetMode(true);
+                                                    setError('');
+                                                    setMessage('');
+                                                }}
+                                                className="text-xs font-semibold text-primary hover:underline"
+                                            >
+                                                {t('Forgot password?')}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="mi-field flex items-center gap-3 px-4">
+                                        <Lock className="h-5 w-5 shrink-0 text-muted-foreground" />
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            placeholder={t('Enter your password')}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword((current) => !current)}
+                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                                            aria-label={showPassword ? t('Hide password') : t('Show password')}
+                                            title={showPassword ? t('Hide password') : t('Show password')}
+                                        >
+                                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {error && (
@@ -183,24 +239,43 @@ export const Auth = () => {
                                 {error}
                             </div>
                         )}
+                        {message && (
+                            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">
+                                {message}
+                            </div>
+                        )}
 
                         <Button type="submit" className="h-12 w-full font-bold" size="lg" isLoading={loading}>
-                            {flowCopy.cta}
+                            {isResetMode ? t('Send reset link') : flowCopy.cta}
                         </Button>
                     </form>
 
-                    <div className="mt-6 border-t border-border/70 pt-5">
-                        <Button variant="ghost" className="w-full" onClick={toggleMode}>
-                            {isLogin ? t('Create an account') : t('Sign in to your account')}
-                        </Button>
+                    <div className="mt-6 grid gap-2 border-t border-border/70 pt-5">
+                        {isResetMode ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="w-full"
+                                onClick={() => {
+                                    setIsResetMode(false);
+                                    setError('');
+                                }}
+                            >
+                                {t('Back to sign in')}
+                            </Button>
+                        ) : (
+                            <Button variant="ghost" className="w-full" onClick={toggleMode}>
+                                {isLogin ? t('Create an account') : t('Sign in to your account')}
+                            </Button>
+                        )}
                     </div>
 
                     <p className="mt-6 text-center text-xs leading-6 text-muted-foreground">
                         {t('By continuing, you agree to our')}{' '}
                         <Link to="/terms" className="font-semibold text-primary hover:underline">{t('Terms of Service')}</Link>
                         {' '}{t('and')}{' '}
-                        <Link to="/privacy" className="font-semibold text-primary hover:underline">{t('Privacy Policy')}</Link>.
-                        {' '}
+                        <Link to="/privacy" className="font-semibold text-primary hover:underline">{t('Privacy Policy')}</Link>
+                        . {t('See also our')}{' '}
                         <Link to="/cookies" className="font-semibold text-primary hover:underline">{t('Cookie Policy')}</Link>.
                     </p>
                 </AppSurface>
