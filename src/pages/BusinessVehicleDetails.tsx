@@ -87,6 +87,9 @@ export const BusinessVehicleDetails = () => {
         if (!orgId) return;
         return onSnapshot(doc(db, 'organizations', orgId), (snapshot) => {
             setOrganization(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Organization) : null);
+        }, (error) => {
+            console.error('Business vehicle organization listener failed', error);
+            setMessage('Business workspace could not be loaded. Please check your workspace permissions.');
         });
     }, [orgId]);
 
@@ -95,6 +98,10 @@ export const BusinessVehicleDetails = () => {
         return onSnapshot(doc(db, 'organizationMembers', `${orgId}_${user.uid}`), (snapshot) => {
             setMember(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as OrganizationMember) : null);
             setLoading(false);
+        }, (error) => {
+            console.error('Business vehicle member listener failed', error);
+            setMessage('Your business membership could not be loaded. Please check your workspace permissions.');
+            setLoading(false);
         });
     }, [orgId, user]);
 
@@ -102,6 +109,9 @@ export const BusinessVehicleDetails = () => {
         if (!id) return;
         return onSnapshot(doc(db, 'vehicles', id), (snapshot) => {
             setVehicle(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Vehicle) : null);
+        }, (error) => {
+            console.error('Business vehicle listener failed', error);
+            setMessage('Vehicle details could not be loaded. Please check your workspace permissions.');
         });
     }, [id]);
 
@@ -110,12 +120,21 @@ export const BusinessVehicleDetails = () => {
         const unsubscribes = [
             onSnapshot(collection(db, 'vehicles', id, 'inspections'), (snapshot) => {
                 setInspections(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as VehicleInspection)));
+            }, (error) => {
+                console.error('Vehicle inspections listener failed', error);
+                setMessage('Inspections could not be loaded. Please check your workspace permissions.');
             }),
             onSnapshot(collection(db, 'vehicles', id, 'issues'), (snapshot) => {
                 setIssues(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as VehicleIssue)));
+            }, (error) => {
+                console.error('Vehicle issues listener failed', error);
+                setMessage('Issues could not be loaded. Please check your workspace permissions.');
             }),
             onSnapshot(collection(db, 'vehicles', id, 'workOrders'), (snapshot) => {
                 setWorkOrders(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as WorkOrder)));
+            }, (error) => {
+                console.error('Vehicle work orders listener failed', error);
+                setMessage('Work orders could not be loaded. Please check your workspace permissions.');
             }),
         ];
         return () => unsubscribes.forEach((unsubscribe) => unsubscribe());

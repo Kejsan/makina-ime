@@ -118,6 +118,9 @@ export const BusinessDashboard = () => {
         if (!orgId) return;
         return onSnapshot(doc(db, 'organizations', orgId), (snapshot) => {
             setOrganization(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Organization) : null);
+        }, (error) => {
+            console.error('Business organization listener failed', error);
+            setMessage('Business workspace could not be loaded. Please check your workspace permissions.');
         });
     }, [orgId]);
 
@@ -125,6 +128,10 @@ export const BusinessDashboard = () => {
         if (!orgId || !user) return;
         return onSnapshot(doc(db, 'organizationMembers', `${orgId}_${user.uid}`), (snapshot) => {
             setMember(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as OrganizationMember) : null);
+            setLoading(false);
+        }, (error) => {
+            console.error('Business member listener failed', error);
+            setMessage('Your business membership could not be loaded. Please check your workspace permissions.');
             setLoading(false);
         });
     }, [orgId, user]);
@@ -134,6 +141,9 @@ export const BusinessDashboard = () => {
         const q = query(collection(db, 'organizationMembers'), where('organizationId', '==', orgId), where('status', '==', 'active'));
         return onSnapshot(q, (snapshot) => {
             setMembers(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as OrganizationMember)));
+        }, (error) => {
+            console.error('Business members listener failed', error);
+            setMessage('Team members could not be loaded. Please check your workspace permissions.');
         });
     }, [orgId, member]);
 
@@ -142,6 +152,9 @@ export const BusinessDashboard = () => {
         const q = query(collection(db, 'vehicles'), where('ownerType', '==', 'organization'), where('ownerId', '==', orgId));
         return onSnapshot(q, (snapshot) => {
             setVehicles(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as Vehicle)));
+        }, (error) => {
+            console.error('Business vehicles listener failed', error);
+            setMessage('Fleet vehicles could not be loaded. Please check your workspace permissions.');
         });
     }, [orgId, member]);
 
@@ -150,6 +163,9 @@ export const BusinessDashboard = () => {
         const q = query(collection(db, 'organizations', orgId, 'vendors'));
         return onSnapshot(q, (snapshot) => {
             setVendors(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as BusinessVendor)));
+        }, (error) => {
+            console.error('Business vendors listener failed', error);
+            setMessage('Vendors could not be loaded. Please check your workspace permissions.');
         });
     }, [orgId, member]);
 

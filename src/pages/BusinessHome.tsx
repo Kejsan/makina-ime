@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FirebaseError } from 'firebase/app';
 import { Building2, Check, ExternalLink, Plus, Users } from 'lucide-react';
 import {
     collection,
@@ -28,6 +29,8 @@ export const BusinessHome = () => {
     const [organizations, setOrganizations] = useState<Record<string, Organization>>({});
     const [invites, setInvites] = useState<OrganizationInvite[]>([]);
     const [isCreating, setIsCreating] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [message, setMessage] = useState('');
     const [name, setName] = useState('');
     const [businessType, setBusinessType] = useState('mixed_fleet');
     const [city, setCity] = useState('');
@@ -42,6 +45,10 @@ export const BusinessHome = () => {
         );
         return onSnapshot(q, (snapshot) => {
             setMemberships(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as OrganizationMember)));
+            setMessage('');
+        }, (error) => {
+            console.error('Business memberships listener failed', error);
+            setMessage('Business workspaces could not be loaded. Please check your Firebase rules deployment.');
         });
     }, [user]);
 
@@ -54,6 +61,9 @@ export const BusinessHome = () => {
         );
         return onSnapshot(q, (snapshot) => {
             setInvites(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as OrganizationInvite)));
+        }, (error) => {
+            console.error('Business invites listener failed', error);
+            setMessage('Business invitations could not be loaded. Please check your Firebase rules deployment.');
         });
     }, [user?.email]);
 
@@ -68,6 +78,9 @@ export const BusinessHome = () => {
                 ...previous,
                 [membership.organizationId]: { id: snapshot.id, ...snapshot.data() } as Organization,
             }));
+        }, (error) => {
+            console.error('Business organization listener failed', error);
+            setMessage('Business workspace details could not be loaded. Please check your Firebase rules deployment.');
         }));
 
         return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
@@ -113,38 +126,55 @@ export const BusinessHome = () => {
             updatedAt: serverTimestamp(),
         });
 
-        await batch.commit();
-        setName('');
-        setCity('');
-        setBusinessType('mixed_fleet');
-        setCurrency('EUR');
-        setIsCreating(false);
-        navigate(`/business/${orgRef.id}`);
+        try {
+            setIsSubmitting(true);
+            setMessage('');
+            await batch.commit();
+            setName('');
+            setCity('');
+            setBusinessType('mixed_fleet');
+            setCurrency('EUR');
+            setIsCreating(false);
+            navigate(`/business/${orgRef.id}`);
+        } catch (error) {
+            console.error('Business workspace creation failed', error);
+            if (error instanceof FirebaseError) console.error('Business workspace creation error code', error.code);
+            setMessage('Business workspace creation failed. Please check your Firebase rules deployment.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const acceptInvite = async (invite: OrganizationInvite) => {
         if (!user) return;
 
         const memberRef = doc(db, 'organizationMembers', `${invite.organizationId}_${user.uid}`);
-        await setDoc(memberRef, {
-            organizationId: invite.organizationId,
-            userId: user.uid,
-            email: user.email?.toLowerCase() || invite.email,
-            displayName: user.displayName || null,
-            role: invite.role,
-            status: 'active',
-            createdBy: invite.createdBy,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        });
+        try {
+            setMessage('');
+            await setDoc(memberRef, {
+                organizationId: invite.organizationId,
+                userId: user.uid,
+                email: user.email?.toLowerCase() || invite.email,
+                displayName: user.displayName || null,
+                role: invite.role,
+                status: 'active',
+                createdBy: invite.createdBy,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
 
-        await updateDoc(doc(db, 'organizationInvites', invite.id), {
-            status: 'accepted',
-            acceptedAt: serverTimestamp(),
-            acceptedBy: user.uid,
-        });
+            await updateDoc(doc(db, 'organizationInvites', invite.id), {
+                status: 'accepted',
+                acceptedAt: serverTimestamp(),
+                acceptedBy: user.uid,
+            });
 
-        navigate(`/business/${invite.organizationId}`);
+            navigate(`/business/${invite.organizationId}`);
+        } catch (error) {
+            console.error('Business invite acceptance failed', error);
+            if (error instanceof FirebaseError) console.error('Business invite acceptance error code', error.code);
+            setMessage('Business invitation acceptance failed. Please check your Firebase rules deployment.');
+        }
     };
 
     return (
@@ -161,6 +191,12 @@ export const BusinessHome = () => {
                         </Button>
                     }
                 />
+
+                {message && (
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                        {message}
+                    </div>
+                )}
 
                 {invites.length > 0 && (
                     <AppSurface className="p-5">
@@ -216,7 +252,7 @@ export const BusinessHome = () => {
                                 </div>
                             </div>
                             <div className="flex flex-col gap-2 sm:flex-row">
-                                <Button type="submit" className="h-11 flex-1">Create workspace</Button>
+                                <Button type="submit" className="h-11 flex-1" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Create workspace'}</Button>
                                 <Button type="button" variant="outline" className="h-11" onClick={() => setIsCreating(false)}>Cancel</Button>
                             </div>
                         </form>

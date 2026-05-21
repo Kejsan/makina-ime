@@ -60,6 +60,25 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.createdBy == request.auth.uid;
     }
 
+    function createsOwnOrganization(orgId) {
+      return isSignedIn()
+        && existsAfter(/databases/$(database)/documents/organizations/$(orgId))
+        && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.createdBy == request.auth.uid;
+    }
+
+    function createsOwnerMembership(orgId) {
+      return isSignedIn()
+        && existsAfter(memberPath(orgId, request.auth.uid))
+        && getAfter(memberPath(orgId, request.auth.uid)).data.organizationId == orgId
+        && getAfter(memberPath(orgId, request.auth.uid)).data.userId == request.auth.uid
+        && getAfter(memberPath(orgId, request.auth.uid)).data.role == 'owner'
+        && getAfter(memberPath(orgId, request.auth.uid)).data.status == 'active';
+    }
+
+    function validBusinessSettingsData() {
+      return request.resource.data.keys().hasOnly(['defaultReminderLeadTimeDays', 'inspectionFailureCreatesWorkOrder', 'preferredCurrency', 'createdAt', 'updatedAt']);
+    }
+
     function canAcceptInvite(orgId, role) {
       return isSignedIn()
         && exists(invitePath(orgId, signedEmail()))
@@ -141,8 +160,9 @@ service cloud.firestore {
 
       match /businessSettings/{settingId} {
         allow read: if canViewOrg(orgId);
-        allow create, update: if request.resource.data.keys().hasOnly(['defaultReminderLeadTimeDays', 'inspectionFailureCreatesWorkOrder', 'preferredCurrency', 'createdAt', 'updatedAt'])
-          && (canManageOrg(orgId) || canOwnNewOrganization(orgId));
+        allow create: if validBusinessSettingsData()
+          && (canManageOrg(orgId) || createsOwnOrganization(orgId) || createsOwnerMembership(orgId));
+        allow update: if validBusinessSettingsData() && canManageOrg(orgId);
         allow delete: if canManageOrg(orgId);
       }
 

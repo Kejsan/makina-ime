@@ -33,10 +33,11 @@ export const Auth = () => {
         setLoading(true);
 
         try {
+            const normalizedEmail = email.trim().toLowerCase();
             if (isLogin) {
-                await signIn(email, password);
+                await signIn(normalizedEmail, password);
             } else {
-                await signUp(email, password);
+                await signUp(normalizedEmail, password);
             }
             navigate(accountType === 'business' ? '/business' : '/app');
         } catch (err: unknown) {
@@ -56,7 +57,7 @@ export const Auth = () => {
         setLoading(true);
 
         try {
-            await resetPassword(email);
+            await resetPassword(email.trim().toLowerCase());
             setMessage(t('Password reset email sent. Check your inbox and spam folder.'));
             setIsResetMode(false);
         } catch (err: unknown) {
