@@ -7,6 +7,7 @@ import {
     Building2,
     Car,
     ClipboardCheck,
+    CreditCard,
     Download,
     FileUp,
     Filter,
@@ -212,6 +213,7 @@ export const BusinessDashboard = () => {
     const allExpenses = useMemo(() => vehicles.flatMap((vehicle) => expensesByVehicle[vehicle.id] || []), [vehicles, expensesByVehicle]);
     const openIssues = useMemo(() => vehicles.flatMap((vehicle) => (issuesByVehicle[vehicle.id] || []).filter((issue) => issue.status !== 'resolved')), [vehicles, issuesByVehicle]);
     const openWorkOrders = useMemo(() => vehicles.flatMap((vehicle) => (workOrdersByVehicle[vehicle.id] || []).filter((workOrder) => !['completed', 'cancelled'].includes(workOrder.status))), [vehicles, workOrdersByVehicle]);
+    const totalSpend = useMemo(() => allExpenses.reduce((total, expense) => total + (expense.amount || 0), 0), [allExpenses]);
     const monthlySpend = useMemo(() => {
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -439,11 +441,12 @@ export const BusinessDashboard = () => {
                     <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">{message}</div>
                 )}
 
-                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
                     <MetricCard icon={Car} label="Vehicles" value={vehicles.length.toString()} detail={`${unavailableCount} unavailable`} tone="blue" />
                     <MetricCard icon={ShieldCheck} label="Compliance" value={`${complianceScore}%`} detail="Healthy records" tone={complianceScore < 75 ? 'amber' : 'emerald'} />
                     <MetricCard icon={AlertTriangle} label="Open issues" value={openIssues.length.toString()} detail={`${openWorkOrders.length} work orders`} tone={openIssues.length ? 'rose' : 'emerald'} />
                     <MetricCard icon={Wrench} label="This month" value={formatCurrency(monthlySpend, currency)} detail="Logged fleet spend" tone="indigo" />
+                    <MetricCard icon={CreditCard} label="Total Expenses" value={formatCurrency(totalSpend, currency)} detail="All logged costs" tone="emerald" />
                     <MetricCard icon={Users} label="Team" value={members.length.toString()} detail={`Your role: ${member?.role || '-'}`} tone="blue" />
                 </section>
 

@@ -363,7 +363,7 @@ export const Dashboard = () => {
                 <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <MetricCard icon={CarIcon} label="Mjetet" value={vehicles.length.toString()} detail="Registered profiles" tone="blue" />
                     <MetricCard icon={DollarSign} label="Kete muaj" value={formatCurrency(monthlySpend)} detail="All logged costs" tone="emerald" />
-                    <MetricCard icon={CreditCard} label="Gjithsej" value={formatCurrency(totalSpend)} detail={`${formatCurrency(linkedSpend)} from linked records`} tone="indigo" />
+                    <MetricCard icon={CreditCard} label="Total Expenses" value={formatCurrency(totalSpend)} detail={`${formatCurrency(linkedSpend)} from linked records`} tone="indigo" />
                     <MetricCard icon={Bell} label="Afatet" value={dueSoonCount.toString()} detail="Deadlines in 30 days" tone={dueSoonCount > 0 ? 'amber' : 'blue'} />
                 </section>
 
