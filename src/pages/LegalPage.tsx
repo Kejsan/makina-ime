@@ -156,7 +156,7 @@ const CookiePolicy = () => (
             <p>Makina Ime may remember preferences such as theme, language, timezone, reminder settings, browser notification choices, and install prompts. These preferences improve usability and reduce repeated setup.</p>
         </Section>
         <Section title="Analytics And Marketing Cookies">
-            <p>Makina Ime does not currently describe any advertising cookie use in the app. If analytics, advertising, retargeting, or marketing cookies are added later, this policy should be updated before those tools are enabled, and consent controls should be added where required.</p>
+            <p>Makina Ime uses Google Analytics 4 to understand public site and app usage, such as page views and general interaction patterns. We do not use uploaded vehicle documents for advertising. If advertising, retargeting, or marketing cookies are added later, this policy should be updated before those tools are enabled, and consent controls should be added where required.</p>
         </Section>
         <Section title="Managing Cookies">
             <p>You can control cookies and site storage through your browser settings. Blocking necessary storage may prevent sign-in, document upload/download, PWA installation, reminders, or other app features from working correctly.</p>
