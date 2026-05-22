@@ -7,6 +7,7 @@ import { Input } from './ui/Input';
 import { Card } from './ui/Card';
 import { DollarSign, Calendar, Trash2, Plus, Tag, Pencil } from 'lucide-react';
 import type { ExpenseRecord } from '../lib/types';
+import { expenseAmount, sumExpenses } from '../lib/expenses';
 
 export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
     const { user } = useAuth();
@@ -144,7 +145,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
         await handleDelete(expense.id);
     };
 
-    const totalStats = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const totalStats = sumExpenses(expenses);
 
     return (
         <div className="space-y-6">
@@ -266,7 +267,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    <span className="font-bold text-lg font-mono">€{expense.amount.toFixed(2)}</span>
+                                    <span className="font-bold text-lg font-mono">€{expenseAmount(expense).toFixed(2)}</span>
                                     {canEditExpense(expense) && (
                                         <button
                                             onClick={() => openEditForm(expense)}

@@ -24,6 +24,7 @@ import { Layout } from '../components/ui/Layout';
 import { AppSurface, EmptyState, MetricCard, PageHeader, Panel, StatusPill } from '../components/ui/design-system';
 import type { ExpenseRecord, Reminder } from '../lib/types';
 import { callR2DocumentFunction } from '../lib/r2Documents';
+import { expenseAmount, sumExpenses } from '../lib/expenses';
 
 interface Vehicle {
     id: string;
@@ -276,11 +277,11 @@ export const Dashboard = () => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthlySpend = allExpenses
         .filter((expense) => expense.date?.toDate && expense.date.toDate() >= monthStart)
-        .reduce((total, expense) => total + (expense.amount || 0), 0);
-    const totalSpend = allExpenses.reduce((total, expense) => total + (expense.amount || 0), 0);
+        .reduce((total, expense) => total + expenseAmount(expense), 0);
+    const totalSpend = sumExpenses(allExpenses);
     const linkedSpend = allExpenses
         .filter((expense) => expense.sourceType && expense.sourceType !== 'manual')
-        .reduce((total, expense) => total + (expense.amount || 0), 0);
+        .reduce((total, expense) => total + expenseAmount(expense), 0);
 
     const upcomingDeadlines = useMemo(() => {
         const legalDeadlines = vehicles.flatMap((vehicle) => {
@@ -402,7 +403,7 @@ export const Dashboard = () => {
                                 {vehicles.map((vehicle) => {
                                     const isSelected = selectedVehicleFilter === vehicle.id;
                                     const vehicleExpenses = expensesByVehicle[vehicle.id] || [];
-                                    const vehicleSpend = vehicleExpenses.reduce((total, expense) => total + (expense.amount || 0), 0);
+                                    const vehicleSpend = sumExpenses(vehicleExpenses);
                                     const expiryDate = dateFromTimestamp(vehicle.registrationExpiry);
                                     const expiryDays = expiryDate ? daysUntil(expiryDate) : null;
                                     const statusTone = expiryDays !== null && expiryDays <= 30 ? 'amber' : 'emerald';
@@ -562,7 +563,7 @@ export const Dashboard = () => {
                                                 <td className="px-5 py-4"><StatusPill tone={expense.sourceType === 'document' ? 'blue' : expense.sourceType === 'service' ? 'amber' : 'emerald'}>{expense.category}</StatusPill></td>
                                                 <td className="max-w-xs truncate px-5 py-4 text-muted-foreground">{expense.notes || expense.sourceLabel || '-'}</td>
                                                 <td className="px-5 py-4 font-mono text-xs text-muted-foreground">{expense.date?.toDate?.().toLocaleDateString() || '-'}</td>
-                                                <td className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{formatCurrency(expense.amount || 0)}</td>
+                                                <td className="px-5 py-4 text-right font-mono font-bold text-emerald-400">{formatCurrency(expenseAmount(expense))}</td>
                                                 <td className="px-5 py-4 text-right">
                                                     {canEditExpense(expense) ? (
                                                         <button

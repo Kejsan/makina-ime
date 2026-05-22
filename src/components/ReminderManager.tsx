@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Bell, Plus, Calendar, CheckCircle, Trash2, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -6,9 +6,10 @@ import { AppSurface, EmptyState, StatusPill } from './ui/design-system';
 import { db } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useParams } from 'react-router-dom';
-import type { Reminder } from '../lib/types';
+import type { Reminder, Vehicle } from '../lib/types';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { getVehicleComplianceDeadlines } from '../lib/business';
 
 const reminderTemplates = [
     { label: 'TPL insurance renewal', title: 'TPL insurance renewal', type: 'insurance', leadTimeDays: 30, recurrence: 'yearly' },
@@ -20,6 +21,10 @@ const reminderTemplates = [
     { label: 'Tires check', title: 'Tires check / replacement', type: 'maintenance', leadTimeDays: 14, recurrence: 'none' },
     { label: 'Brake service', title: 'Brake service', type: 'maintenance', leadTimeDays: 14, recurrence: 'none' },
 ] as const;
+
+type ReminderListItem = Reminder & {
+    source?: 'manual' | 'vehicle';
+};
 
 export const ReminderManager = ({
     ownerType = 'personal',
@@ -33,7 +38,9 @@ export const ReminderManager = ({
     const { id: vehicleId } = useParams<{ id: string }>();
     const { user } = useAuth();
     const [reminders, setReminders] = useState<Reminder[]>([]);
+    const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     
     // Form state
@@ -45,13 +52,23 @@ export const ReminderManager = ({
     const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
-        if (!vehicleId) return;
+        if (!vehicleId || !user) return;
+        setLoading(true);
 
-        const q = query(
-            collection(db, 'reminders'),
-            where('vehicleId', '==', vehicleId),
-            where('completed', '==', false) // Only show active remiders
-        );
+        const constraints = ownerType === 'organization' && ownerId
+            ? [
+                where('ownerType', '==', 'organization'),
+                where('ownerId', '==', ownerId),
+                where('vehicleId', '==', vehicleId),
+                where('completed', '==', false),
+            ]
+            : [
+                where('userId', '==', user.uid),
+                where('vehicleId', '==', vehicleId),
+                where('completed', '==', false),
+            ];
+
+        const q = query(collection(db, 'reminders'), ...constraints);
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({
@@ -63,11 +80,53 @@ export const ReminderManager = ({
             setReminders(data.sort((a, b) => 
                 (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0)
             ));
+            setLoadError('');
+            setLoading(false);
+        }, (error) => {
+            console.error('Reminder listener failed', error);
+            setLoadError('Reminders could not be loaded. Please check your account permissions and try again.');
             setLoading(false);
         });
 
         return unsubscribe;
+    }, [ownerId, ownerType, user, vehicleId]);
+
+    useEffect(() => {
+        if (!vehicleId) return;
+        const unsubscribe = onSnapshot(doc(db, 'vehicles', vehicleId), (snapshot) => {
+            setVehicle(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Vehicle) : null);
+        }, (error) => {
+            console.error('Reminder vehicle listener failed', error);
+        });
+        return unsubscribe;
     }, [vehicleId]);
+
+    const vehicleDeadlineItems = useMemo<ReminderListItem[]>(() => {
+        if (!vehicle) return [];
+        return getVehicleComplianceDeadlines(vehicle).map((deadline) => ({
+            id: `vehicle-${deadline.key}`,
+            userId: user?.uid || '',
+            vehicleId: vehicle.id,
+            ownerType,
+            ownerId: ownerId || user?.uid,
+            organizationId,
+            type: deadline.key === 'insurance' ? 'insurance' : deadline.key === 'tax' ? 'tax' : 'inspection',
+            title: deadline.label,
+            dueDate: Timestamp.fromDate(deadline.date),
+            leadTimeDays: 30,
+            recurrence: deadline.key === 'inspection' ? 'biennial' : 'yearly',
+            completed: false,
+            createdAt: Timestamp.fromDate(deadline.date),
+            source: 'vehicle',
+        }));
+    }, [organizationId, ownerId, ownerType, user?.uid, vehicle]);
+
+    const allReminderItems = useMemo<ReminderListItem[]>(() => {
+        const explicitReminders = reminders.map((reminder) => ({ ...reminder, source: 'manual' as const }));
+        const explicitKeys = new Set(explicitReminders.map((reminder) => `${reminder.type}-${reminder.dueDate?.seconds || ''}-${reminder.title}`));
+        const derived = vehicleDeadlineItems.filter((item) => !explicitKeys.has(`${item.type}-${item.dueDate?.seconds || ''}-${item.title}`));
+        return [...explicitReminders, ...derived].sort((a, b) => (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0));
+    }, [reminders, vehicleDeadlineItems]);
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -216,11 +275,15 @@ export const ReminderManager = ({
                  <div className="text-center py-8">
                     <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
                 </div>
-            ) : reminders.length === 0 ? (
+            ) : loadError ? (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                    {loadError}
+                </div>
+            ) : allReminderItems.length === 0 ? (
                 <EmptyState icon={Bell} title="No active reminders" description="Use a legal or maintenance template to create your first reminder." />
             ) : (
                 <div className="space-y-3">
-                    {reminders.map((reminder) => {
+                    {allReminderItems.map((reminder) => {
                         const daysLeft = getDaysRemaining(reminder.dueDate);
                         const isUrgent = daysLeft <= 7;
                         
@@ -240,25 +303,28 @@ export const ReminderManager = ({
                                             </span>
                                             <StatusPill tone="slate">{reminder.leadTimeDays || 0}d lead</StatusPill>
                                             <StatusPill tone="blue">{reminder.recurrence || 'none'}</StatusPill>
+                                            {reminder.source === 'vehicle' && <StatusPill tone="emerald">Vehicle date</StatusPill>}
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button 
-                                        onClick={() => handleComplete(reminder.id)}
-                                        className="p-2 hover:bg-green-500/10 text-muted-foreground hover:text-green-500 rounded-full transition-colors" 
-                                        title="Mark Complete"
-                                    >
-                                        <CheckCircle className="w-5 h-5" />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(reminder.id)}
-                                        className="p-2 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-full transition-colors"
-                                        title="Delete"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
+                                {reminder.source !== 'vehicle' && (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleComplete(reminder.id)}
+                                            className="p-2 hover:bg-green-500/10 text-muted-foreground hover:text-green-500 rounded-full transition-colors"
+                                            title="Mark Complete"
+                                        >
+                                            <CheckCircle className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(reminder.id)}
+                                            className="p-2 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-full transition-colors"
+                                            title="Delete"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
                             </AppSurface>
                         );
                     })}

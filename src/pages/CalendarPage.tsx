@@ -10,6 +10,7 @@ import { AppSurface, EmptyState, PageHeader, Panel, StatusPill } from '../compon
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import type { Reminder, Vehicle } from '../lib/types';
+import { getVehicleComplianceDeadlines } from '../lib/business';
 
 const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -21,6 +22,10 @@ const startOfDay = (date: Date) => {
 
 const daysUntil = (date: Date) => Math.ceil((startOfDay(date).getTime() - startOfDay(new Date()).getTime()) / (1000 * 60 * 60 * 24));
 
+type CalendarReminder = Reminder & {
+    source?: 'manual' | 'vehicle';
+};
+
 export const CalendarPage = () => {
     const { t } = useTranslation();
     const { user } = useAuth();
@@ -31,6 +36,7 @@ export const CalendarPage = () => {
     const [view, setView] = useState<'list' | 'month'>('list');
     const [isCustomOpen, setIsCustomOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [loadError, setLoadError] = useState('');
     const [customReminder, setCustomReminder] = useState({
         vehicleId: '',
         title: '',
@@ -47,6 +53,10 @@ export const CalendarPage = () => {
             setVehicles(snapshot.docs
                 .map((item) => ({ id: item.id, ...item.data() } as Vehicle))
                 .filter((vehicle) => vehicle.ownerType !== 'organization'));
+            setLoadError('');
+        }, (error) => {
+            console.error('Calendar vehicles listener failed', error);
+            setLoadError('Calendar data could not be loaded. Please check your account permissions and try again.');
         });
         return unsubscribe;
     }, [user]);
@@ -57,6 +67,10 @@ export const CalendarPage = () => {
             setReminders(snapshot.docs
                 .map((item) => ({ id: item.id, ...item.data() } as Reminder))
                 .filter((reminder) => reminder.ownerType !== 'organization'));
+            setLoadError('');
+        }, (error) => {
+            console.error('Calendar reminders listener failed', error);
+            setLoadError('Calendar data could not be loaded. Please check your account permissions and try again.');
         });
         return unsubscribe;
     }, [user]);
@@ -66,11 +80,33 @@ export const CalendarPage = () => {
         return vehicle ? `${vehicle.make} ${vehicle.model}` : 'Vehicle';
     };
 
-    const filteredReminders = useMemo(() => reminders
+    const calendarReminders = useMemo<CalendarReminder[]>(() => {
+        const explicitReminders = reminders.map((reminder) => ({ ...reminder, source: 'manual' as const }));
+        const explicitKeys = new Set(explicitReminders.map((reminder) => `${reminder.vehicleId}-${reminder.type}-${reminder.dueDate?.seconds || ''}-${reminder.title}`));
+        const vehicleDeadlines = vehicles.flatMap((vehicle) => getVehicleComplianceDeadlines(vehicle).map((deadline) => ({
+            id: `vehicle-${vehicle.id}-${deadline.key}`,
+            userId: user?.uid || '',
+            vehicleId: vehicle.id,
+            ownerType: 'personal' as const,
+            ownerId: user?.uid,
+            type: deadline.key === 'insurance' ? 'insurance' : deadline.key === 'tax' ? 'tax' : 'inspection',
+            title: deadline.label,
+            dueDate: Timestamp.fromDate(deadline.date),
+            leadTimeDays: 30,
+            recurrence: deadline.key === 'inspection' ? 'biennial' as const : 'yearly' as const,
+            completed: false,
+            createdAt: Timestamp.fromDate(deadline.date),
+            source: 'vehicle' as const,
+        }))).filter((item) => !explicitKeys.has(`${item.vehicleId}-${item.type}-${item.dueDate.seconds}-${item.title}`));
+
+        return [...explicitReminders, ...vehicleDeadlines];
+    }, [reminders, user?.uid, vehicles]);
+
+    const filteredReminders = useMemo(() => calendarReminders
         .filter((reminder) => !reminder.completed && reminder.dueDate?.toDate)
         .filter((reminder) => vehicleFilter === 'all' || reminder.vehicleId === vehicleFilter)
         .filter((reminder) => typeFilter === 'all' || reminder.type === typeFilter)
-        .sort((left, right) => left.dueDate.toMillis() - right.dueDate.toMillis()), [reminders, vehicleFilter, typeFilter]);
+        .sort((left, right) => left.dueDate.toMillis() - right.dueDate.toMillis()), [calendarReminders, vehicleFilter, typeFilter]);
 
     const monthDays = useMemo(() => {
         const first = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -175,6 +211,12 @@ export const CalendarPage = () => {
                     </div>
                 </AppSurface>
 
+                {loadError && (
+                    <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                        {loadError}
+                    </div>
+                )}
+
                 {filteredReminders.length === 0 ? (
                     <EmptyState icon={CalendarDays} title={t('No reminders found')} description={t('Create reminders from a vehicle profile or document expiry to populate the calendar.')} />
                 ) : view === 'list' ? (
@@ -195,6 +237,7 @@ export const CalendarPage = () => {
                                         </h2>
                                         <p className="mt-2 text-sm text-muted-foreground">
                                             {due.toLocaleDateString()} · {reminder.leadTimeDays} {t('day lead')} · {reminder.recurrence}
+                                            {reminder.source === 'vehicle' ? ` · ${t('Vehicle date')}` : ''}
                                         </p>
                                     </div>
                                     <StatusPill tone={tone}>{daysLeft < 0 ? t('Expired') : `${daysLeft} ${t('days')}`}</StatusPill>

@@ -47,6 +47,7 @@ import {
     organizationRoles,
     parseSimpleCsv,
 } from '../lib/business';
+import { expenseAmount, sumExpenses } from '../lib/expenses';
 import type {
     BusinessVendor,
     ExpenseRecord,
@@ -213,13 +214,13 @@ export const BusinessDashboard = () => {
     const allExpenses = useMemo(() => vehicles.flatMap((vehicle) => expensesByVehicle[vehicle.id] || []), [vehicles, expensesByVehicle]);
     const openIssues = useMemo(() => vehicles.flatMap((vehicle) => (issuesByVehicle[vehicle.id] || []).filter((issue) => issue.status !== 'resolved')), [vehicles, issuesByVehicle]);
     const openWorkOrders = useMemo(() => vehicles.flatMap((vehicle) => (workOrdersByVehicle[vehicle.id] || []).filter((workOrder) => !['completed', 'cancelled'].includes(workOrder.status))), [vehicles, workOrdersByVehicle]);
-    const totalSpend = useMemo(() => allExpenses.reduce((total, expense) => total + (expense.amount || 0), 0), [allExpenses]);
+    const totalSpend = useMemo(() => sumExpenses(allExpenses), [allExpenses]);
     const monthlySpend = useMemo(() => {
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         return allExpenses
             .filter((expense) => expense.date?.toDate && expense.date.toDate() >= monthStart)
-            .reduce((total, expense) => total + (expense.amount || 0), 0);
+            .reduce((total, expense) => total + expenseAmount(expense), 0);
     }, [allExpenses]);
 
     const unavailableCount = vehicles.filter((vehicle) => ['in_service', 'needs_attention', 'out_of_service'].includes(vehicle.businessStatus || '')).length;
@@ -499,7 +500,7 @@ export const BusinessDashboard = () => {
                                         <tbody className="divide-y divide-border/60">
                                             {filteredVehicles.map((vehicle) => {
                                                 const state = getVehicleComplianceState(vehicle);
-                                                const spend = (expensesByVehicle[vehicle.id] || []).reduce((total, expense) => total + (expense.amount || 0), 0);
+                                                const spend = sumExpenses(expensesByVehicle[vehicle.id] || []);
                                                 return (
                                                     <tr key={vehicle.id} className="hover:bg-accent/35">
                                                         <td className="px-5 py-4">
@@ -576,8 +577,8 @@ export const BusinessDashboard = () => {
                                 <BarChart3 className="h-5 w-5 text-primary" />
                             </div>
                             <div className="grid gap-3 text-sm">
-                                <Panel className="flex justify-between p-3"><span>Maintenance spend</span><strong>{formatCurrency(allExpenses.filter((expense) => expense.category === 'Maintenance').reduce((total, expense) => total + (expense.amount || 0), 0), currency)}</strong></Panel>
-                                <Panel className="flex justify-between p-3"><span>Avg cost / vehicle</span><strong>{formatCurrency(vehicles.length ? allExpenses.reduce((total, expense) => total + (expense.amount || 0), 0) / vehicles.length : 0, currency)}</strong></Panel>
+                                <Panel className="flex justify-between p-3"><span>Maintenance spend</span><strong>{formatCurrency(allExpenses.filter((expense) => expense.category === 'Maintenance').reduce((total, expense) => total + expenseAmount(expense), 0), currency)}</strong></Panel>
+                                <Panel className="flex justify-between p-3"><span>Avg cost / vehicle</span><strong>{formatCurrency(vehicles.length ? totalSpend / vehicles.length : 0, currency)}</strong></Panel>
                                 <Panel className="flex justify-between p-3"><span>Unavailable vehicles</span><strong>{unavailableCount}</strong></Panel>
                             </div>
                         </AppSurface>
