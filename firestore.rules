@@ -141,14 +141,15 @@ service cloud.firestore {
         || resource.data.sourceType == 'service';
     }
 
-    function canUpdateManualExpense(vehicleId) {
+    function canUpdateClientExpense(vehicleId) {
       return canEditVehicle(vehicleId)
-        && (!('sourceType' in resource.data) || resource.data.sourceType == 'manual')
+        && (!('sourceType' in resource.data) || resource.data.sourceType in ['manual', 'service'])
         && (!('userId' in resource.data) || request.resource.data.userId == resource.data.userId)
         && (!('vehicleId' in resource.data) || resource.data.vehicleId == vehicleId)
         && (!('vehicleId' in request.resource.data) || request.resource.data.vehicleId == vehicleId)
-        && (!('sourceType' in request.resource.data) || request.resource.data.sourceType == 'manual')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['category', 'amount', 'date', 'notes', 'updatedAt']);
+        && (!('sourceType' in request.resource.data) || request.resource.data.sourceType == resource.data.sourceType)
+        && (!('sourceId' in resource.data) || request.resource.data.sourceId == resource.data.sourceId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['category', 'amount', 'date', 'notes', 'sourceLabel', 'updatedAt']);
     }
 
     match /organizations/{orgId} {
@@ -227,7 +228,7 @@ service cloud.firestore {
         allow create: if canDriverVehicle(vehicleId)
           && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid);
         allow update: if canEditVehicle(vehicleId)
-          && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid);
+          && (!('userId' in resource.data) || request.resource.data.userId == resource.data.userId);
       }
 
       match /expenses/{expenseId} {
@@ -238,7 +239,7 @@ service cloud.firestore {
           && request.resource.data.vehicleId == vehicleId
           && validLinkedSourceCreate()
           && request.resource.data.keys().hasOnly(['userId', 'vehicleId', 'category', 'amount', 'date', 'notes', 'sourceType', 'sourceId', 'sourceLabel', 'createdAt']);
-        allow update: if canUpdateManualExpense(vehicleId);
+        allow update: if canUpdateClientExpense(vehicleId);
       }
 
       match /documents/{documentId} {

@@ -32,10 +32,18 @@ export const LocalizedDom = () => {
         const translateTextNode = (node: Text) => {
             if (shouldSkip(node)) return;
 
-            const original = textOriginals.get(node) || node.data;
-            textOriginals.set(node, original);
+            const previousOriginal = textOriginals.get(node);
+            const previousTranslation = previousOriginal ? translateValue(previousOriginal) : null;
+            const original = previousOriginal && node.data === previousTranslation ? previousOriginal : node.data;
             const translated = translateValue(original);
-            if (node.data !== translated) node.data = translated;
+
+            if (translated !== original) {
+                textOriginals.set(node, original);
+                if (node.data !== translated) node.data = translated;
+            } else {
+                textOriginals.delete(node);
+                if (node.data !== original) node.data = original;
+            }
         };
 
         const translateElement = (element: Element) => {

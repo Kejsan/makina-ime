@@ -101,6 +101,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         navigate('/auth');
     };
 
+    const handleQuickAdd = () => {
+        window.dispatchEvent(new CustomEvent('makina-ime:quick-add'));
+    };
+
     const navItems = [
         { icon: LayoutDashboard, label: t('Dashboard'), href: '/app' },
         { icon: Building2, label: 'Business', href: '/business' },
@@ -110,7 +114,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <div className="flex min-h-screen pb-20 md:pb-0">
+            <div className="flex min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
                 <aside className="hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-border/80 bg-card/70 p-5 backdrop-blur-xl md:sticky md:top-0 md:flex">
                     <div>
                         <Link to="/app" className="mb-8 flex items-center gap-3">
@@ -171,12 +175,12 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 </aside>
 
                 <main className="min-w-0 flex-1">
-                    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/80 bg-background/90 px-4 backdrop-blur-xl md:hidden">
+                    <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-border/80 bg-background/90 px-4 pt-safe backdrop-blur-xl md:hidden">
                         <Link to="/app" className="flex items-center gap-2.5">
                             <img src={logo} alt="Makina Ime" className="h-8 w-auto object-contain" />
                         </Link>
                         <div className="flex items-center gap-2">
-                            <PwaInstallButton compact />
+                            <PwaInstallButton compact autoOffer />
                             <ThemeToggle className="h-9 w-9" />
                             <div className="relative">
                                 <button
@@ -194,7 +198,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         </div>
                     </header>
 
-                    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 md:py-8 lg:px-10">
+                    <div className="mx-auto max-w-7xl overflow-x-hidden px-4 py-5 pb-28 sm:px-6 md:py-8 md:pb-8 lg:px-10">
                         {children}
                     </div>
                 </main>
@@ -204,13 +208,15 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 <MobileNavItem icon={LayoutDashboard} label="Paneli" href="/app" isActive={location.pathname === '/app'} />
                 <MobileNavItem icon={Building2} label="Biznes" href="/business" isActive={location.pathname.startsWith('/business')} />
                 <MobileNavItem icon={Car} label="Garazhi" href="/app" isActive={location.pathname.startsWith('/vehicle')} />
-                <Link
-                    to="/app"
+                <button
+                    type="button"
+                    onClick={handleQuickAdd}
                     className="relative -top-5 flex h-14 w-14 items-center justify-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-lg shadow-primary/25"
                     aria-label="Add record"
+                    title="Add record"
                 >
                     <Plus className="h-6 w-6 stroke-[3]" />
-                </Link>
+                </button>
                 <MobileNavItem icon={CalendarDays} label="Kalendari" href="/calendar" isActive={location.pathname === '/calendar'} />
                 <MobileNavItem icon={User} label="Profili" href="/profile" isActive={location.pathname === '/profile'} />
             </nav>

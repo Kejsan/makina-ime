@@ -1,0 +1,39 @@
+# Makina Ime
+
+> Free web app for personal vehicle management and business fleet recordkeeping.
+
+Makina Ime helps private car owners and businesses keep vehicle documents, service history, expenses, renewal dates, reminders, inspections, work orders, assignments, and fleet status in one organized browser app. The first version is free, with a paid version planned later for advanced capabilities.
+
+## Primary Pages
+
+- [Personal Garage](https://makinaime.dpdns.org/): Free personal vehicle management app for private car owners who need document records, renewal reminders, service history, and expense totals.
+- [Business Fleet](https://makinaime.dpdns.org/business-fleet): Free business fleet workspace for companies, taxi fleets, rental fleets, service vehicles, car sellers, and mixed fleets.
+
+## Personal Vehicle Features
+
+- Vehicle profiles for make, model, year, plate, VIN, mileage, engine capacity, value, and renewal dates.
+- Document records for insurance, registration, inspection, road tax, ownership, service invoices, and warranties.
+- Renewal reminders for TPL insurance, road tax, technical inspection, tinted-glass certificates, and custom maintenance.
+- Expense tracking for fuel, servicing, parking, tax, insurance, documents, maintenance, and independent costs.
+
+## Business Fleet Features
+
+- Organization workspaces with shared fleet records.
+- Team roles for owners, admins, managers, drivers, and viewers.
+- Vehicle assignments, statuses, inspections, issues, work orders, vendors, and exports.
+- Fleet dashboards for compliance, upcoming deadlines, open issues, unavailable vehicles, monthly spend, total spend, and vehicle-level costs.
+
+## Legal and Trust Pages
+
+- [Privacy Policy](https://makinaime.dpdns.org/privacy): Explains data collection, uploaded files, business workspace visibility, exports, and deletion requests.
+- [Terms and Conditions](https://makinaime.dpdns.org/terms): Explains account use, business roles, shared records, service limits, files, and availability.
+- [Cookie Policy](https://makinaime.dpdns.org/cookies): Explains necessary browser storage, preferences, PWA behavior, analytics, and controls.
+
+## Crawl and Indexing Notes
+
+- Canonical production domain: https://makinaime.dpdns.org
+- Sitemap: https://makinaime.dpdns.org/sitemap.xml
+- Robots policy: https://makinaime.dpdns.org/robots.txt
+- Extended LLM context: https://makinaime.dpdns.org/llms-full.txt
+- Authenticated app routes are private and intentionally excluded from the sitemap.
+- Public pages include structured data for the site, organization, web application, breadcrumbs, and visible FAQs.

@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { AppSurface, Panel, StatusPill, ThemeToggle } from '../components/ui/design-system';
 import { PwaInstallButton } from '../components/PwaInstallButton';
 import { useAuth } from '../context/AuthContext';
+import { Seo } from '../lib/seo';
 import logo from '../assets/Makina Ime Logo.png';
 
 export const Auth = () => {
@@ -112,6 +113,12 @@ export const Auth = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
+            <Seo
+                title="Sign in or create an account | Makina Ime"
+                description="Sign in to Makina Ime or create a free personal vehicle garage or business fleet workspace account."
+                path="/auth"
+                robots="noindex,follow"
+            />
             <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
                 <Link to="/" className="flex items-center gap-3">
                     <img src={logo} alt="Makina Ime" className="h-10 w-auto" />

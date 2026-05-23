@@ -80,6 +80,7 @@ export const BusinessVehicleDetails = () => {
     const [issues, setIssues] = useState<VehicleIssue[]>([]);
     const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
     const [activeTab, setActiveTab] = useState<BusinessVehicleTab>('overview');
+    const [quickAddToken, setQuickAddToken] = useState(0);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState('');
 
@@ -139,6 +140,16 @@ export const BusinessVehicleDetails = () => {
         ];
         return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
     }, [id, member]);
+
+    useEffect(() => {
+        const handleQuickAdd = () => {
+            if (activeTab === 'overview' || activeTab === 'assignment') setActiveTab('expenses');
+            setQuickAddToken((current) => current + 1);
+        };
+
+        window.addEventListener('makina-ime:quick-add', handleQuickAdd);
+        return () => window.removeEventListener('makina-ime:quick-add', handleQuickAdd);
+    }, [activeTab]);
 
     const editable = canEditFleet(member);
     const canSubmit = canSubmitDriverRecords(member);
@@ -249,10 +260,10 @@ export const BusinessVehicleDetails = () => {
                     </div>
                 )}
 
-                {activeTab === 'documents' && <DocumentManager />}
-                {activeTab === 'services' && <ServiceLog vehicleId={id!} />}
-                {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} />}
-                {activeTab === 'reminders' && <ReminderManager ownerType="organization" ownerId={orgId} organizationId={orgId} />}
+                {activeTab === 'documents' && <DocumentManager quickAddToken={quickAddToken} />}
+                {activeTab === 'services' && <ServiceLog vehicleId={id!} quickAddToken={quickAddToken} />}
+                {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} quickAddToken={quickAddToken} />}
+                {activeTab === 'reminders' && <ReminderManager ownerType="organization" ownerId={orgId} organizationId={orgId} quickAddToken={quickAddToken} />}
                 {activeTab === 'inspections' && <InspectionPanel orgId={orgId!} vehicleId={id!} member={member} vehicle={vehicle} inspections={inspections} canSubmit={canSubmit} />}
                 {activeTab === 'issues' && <IssuesPanel orgId={orgId!} vehicleId={id!} issues={issues} editable={editable} />}
                 {activeTab === 'workOrders' && <WorkOrdersPanel orgId={orgId!} vehicleId={id!} workOrders={workOrders} editable={editable} currency={currency} />}

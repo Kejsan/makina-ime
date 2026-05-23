@@ -1,0 +1,88 @@
+# Makina Ime crawl policy
+# Public marketing and legal pages are crawlable. Authenticated app workspaces are private
+# and should not be crawled or indexed.
+
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /profile
+Disallow: /vehicle/
+Disallow: /business/
+Disallow: /.netlify/functions/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /app
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /profile
+Disallow: /vehicle/
+Disallow: /business/
+Disallow: /.netlify/functions/
+
+User-agent: GPTBot
+Allow: /
+Disallow: /app
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /profile
+Disallow: /vehicle/
+Disallow: /business/
+Disallow: /.netlify/functions/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /app
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /profile
+Disallow: /vehicle/
+Disallow: /business/
+Disallow: /.netlify/functions/
+
+User-agent: ClaudeBot
+Allow: /
+Crawl-delay: 1
+Disallow: /app
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /profile
+Disallow: /vehicle/
+Disallow: /business/
+Disallow: /.netlify/functions/
+
+User-agent: Claude-SearchBot
+Allow: /
+Crawl-delay: 1
+Disallow: /app
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /profile
+Disallow: /vehicle/
+Disallow: /business/
+Disallow: /.netlify/functions/
+
+User-agent: Claude-User
+Allow: /
+Crawl-delay: 1
+Disallow: /app
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /profile
+Disallow: /vehicle/
+Disallow: /business/
+Disallow: /.netlify/functions/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /app
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /profile
+Disallow: /vehicle/
+Disallow: /business/
+Disallow: /.netlify/functions/
+
+Sitemap: https://makinaime.dpdns.org/sitemap.xml

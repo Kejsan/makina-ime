@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, Timestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, Timestamp, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/Button';
@@ -7,9 +7,9 @@ import { Input } from './ui/Input';
 import { Card } from './ui/Card';
 import { DollarSign, Calendar, Trash2, Plus, Tag, Pencil } from 'lucide-react';
 import type { ExpenseRecord } from '../lib/types';
-import { expenseAmount, sumExpenses } from '../lib/expenses';
+import { expenseAmount, moneyValue, sumExpenses } from '../lib/expenses';
 
-export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
+export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: string; quickAddToken?: number }) => {
     const { user } = useAuth();
     const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
 
     const categories = ['Fuel', 'Insurance', 'Tax', 'Parking', 'Tolls', 'Cleaning', 'Maintenance', 'Document', 'Other'];
 
-    const canEditExpense = (expense: ExpenseRecord) => !expense.sourceType || expense.sourceType === 'manual';
+    const canEditExpense = (expense: ExpenseRecord) => !expense.sourceType || expense.sourceType === 'manual' || expense.sourceType === 'service';
 
     const formatDateInput = (expenseDate?: Timestamp) => {
         const dateValue = expenseDate?.toDate?.();
@@ -62,7 +62,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
 
         setEditingExpense(expense);
         setCategory(expense.category || 'Fuel');
-        setAmount(String(expense.amount || ''));
+        setAmount(String(expenseAmount(expense) || ''));
         setDate(formatDateInput(expense.date));
         setNotes(expense.notes || '');
         setFormError('');
@@ -91,15 +91,21 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
         return unsubscribe;
     }, [vehicleId]);
 
+    useEffect(() => {
+        if (quickAddToken > 0) openCreateForm();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quickAddToken]);
+
     const handleSaveExpense = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
 
         try {
             setFormError('');
+            const parsedAmount = moneyValue(amount);
             const payload = {
                 category,
-                amount: parseFloat(amount),
+                amount: parsedAmount,
                 date: Timestamp.fromDate(new Date(date)),
                 notes: notes.trim(),
             };
@@ -110,10 +116,25 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                     return;
                 }
 
-                await updateDoc(doc(db, 'vehicles', vehicleId, 'expenses', editingExpense.id), {
-                    ...payload,
-                    updatedAt: Timestamp.now(),
-                });
+                if (editingExpense.sourceType === 'service' && editingExpense.sourceId) {
+                    const batch = writeBatch(db);
+                    batch.update(doc(db, 'vehicles', vehicleId, 'expenses', editingExpense.id), {
+                        ...payload,
+                        sourceLabel: notes.trim().replace(/^Service:\s*/i, '') || editingExpense.sourceLabel || 'Service',
+                        updatedAt: Timestamp.now(),
+                    });
+                    batch.update(doc(db, 'vehicles', vehicleId, 'services', editingExpense.sourceId), {
+                        cost: parsedAmount,
+                        date: payload.date,
+                        updatedAt: Timestamp.now(),
+                    });
+                    await batch.commit();
+                } else {
+                    await updateDoc(doc(db, 'vehicles', vehicleId, 'expenses', editingExpense.id), {
+                        ...payload,
+                        updatedAt: Timestamp.now(),
+                    });
+                }
             } else {
                 await addDoc(collection(db, 'vehicles', vehicleId, 'expenses'), {
                     userId: user.uid,
@@ -137,8 +158,13 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
     };
 
     const handleDeleteClick = async (expense: ExpenseRecord) => {
-        if (expense.sourceType && expense.sourceType !== 'manual') {
-            alert('This expense is linked to another record. Delete the related service or document instead.');
+        if (expense.sourceType === 'document') {
+            alert('This expense is linked to a document. Delete or replace the related document instead.');
+            return;
+        }
+
+        if (expense.sourceType === 'service') {
+            alert('This expense is linked to a service. Delete the related service record instead.');
             return;
         }
 
@@ -241,14 +267,14 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                 ) : (
                     expenses.map(expense => (
                         <Card key={expense.id} className="p-4 hover:border-primary/30 transition-all duration-300 group">
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex min-w-0 items-center gap-4">
                                     <div className="p-2.5 bg-surface rounded-xl border border-border">
                                         <Tag className="w-4 h-4 text-muted-foreground" />
                                     </div>
-                                    <div>
+                                    <div className="min-w-0">
                                         <h4 className="font-bold">{expense.category}</h4>
-                                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1">
                                                 <Calendar className="w-3 h-3" />
                                                 {expense.date?.toDate().toLocaleDateString()}
@@ -266,7 +292,7 @@ export const ExpenseTracker = ({ vehicleId }: { vehicleId: string }) => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4">
+                                <div className="flex shrink-0 items-center justify-end gap-3">
                                     <span className="font-bold text-lg font-mono">€{expenseAmount(expense).toFixed(2)}</span>
                                     {canEditExpense(expense) && (
                                         <button

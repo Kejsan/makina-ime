@@ -48,6 +48,7 @@ export const VehicleDetails = () => {
     const [vehicle, setVehicle] = useState<VehicleDetailsData | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<VehicleTab>('overview');
+    const [quickAddToken, setQuickAddToken] = useState(0);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editForm, setEditForm] = useState({
@@ -80,6 +81,16 @@ export const VehicleDetails = () => {
         });
         return unsubscribe;
     }, [id, navigate]);
+
+    useEffect(() => {
+        const handleQuickAdd = () => {
+            if (activeTab === 'overview') setActiveTab('expenses');
+            setQuickAddToken((current) => current + 1);
+        };
+
+        window.addEventListener('makina-ime:quick-add', handleQuickAdd);
+        return () => window.removeEventListener('makina-ime:quick-add', handleQuickAdd);
+    }, [activeTab]);
 
     const formatDateInput = (timestamp?: Timestamp | null) => {
         if (!timestamp?.toDate) return '';
@@ -254,14 +265,14 @@ export const VehicleDetails = () => {
                     </div>
                 )}
 
-                {activeTab === 'services' && <ServiceLog vehicleId={id!} />}
-                {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} />}
-                {activeTab === 'documents' && <DocumentManager />}
-                {activeTab === 'reminders' && <ReminderManager />}
+                {activeTab === 'services' && <ServiceLog vehicleId={id!} quickAddToken={quickAddToken} />}
+                {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} quickAddToken={quickAddToken} />}
+                {activeTab === 'documents' && <DocumentManager quickAddToken={quickAddToken} />}
+                {activeTab === 'reminders' && <ReminderManager quickAddToken={quickAddToken} />}
 
                 {isEditing && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                        <AppSurface className="max-h-[92vh] w-full max-w-2xl overflow-y-auto p-6 shadow-2xl">
+                        <AppSurface className="app-dialog-panel w-full max-w-2xl p-6 shadow-2xl">
                             <div className="mb-6 flex items-start justify-between gap-4">
                                 <div>
                                     <h2 className="flex items-center gap-2 text-xl font-bold">

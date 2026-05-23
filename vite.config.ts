@@ -10,9 +10,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png', 'pwa-192x192.png'],
       workbox: {
+        clientsClaim: true,
+        skipWaiting: true,
         globIgnores: ['**/ocr-*.js', '**/vendor-ocr-*.js', '**/pdf.worker-*.mjs']
       },
       manifest: {
+        id: '/',
         name: 'Makina Ime',
         short_name: 'Makina Ime',
         description: 'Premium Vehicle Management & Reminder System',

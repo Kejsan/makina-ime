@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './ui/Button';
@@ -79,15 +80,10 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
         setShowOffer(false);
     };
 
-    return (
+    const overlays = (
         <>
-            <Button type="button" variant="outline" size={compact ? 'icon' : 'sm'} onClick={startInstall} title={t('Install App')} aria-label={t('Install App')}>
-                <Download className={compact ? 'h-4 w-4' : 'mr-2 h-4 w-4'} />
-                {!compact && t('Install App')}
-            </Button>
-
             {showOffer && (
-                <div className="fixed inset-x-3 bottom-4 z-50 md:hidden">
+                <div className="install-offer-panel fixed inset-x-3 z-50 md:hidden">
                     <AppSurface className="border-primary/30 p-4 shadow-2xl">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -117,7 +113,7 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
 
             {showInstructions && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="w-full max-w-sm p-5 shadow-2xl">
+                    <AppSurface className="app-dialog-panel w-full max-w-sm p-5 shadow-2xl">
                         <div className="mb-4 flex items-start justify-between gap-4">
                             <div>
                                 <h2 className="text-lg font-bold">{t('Install Makina Ime')}</h2>
@@ -135,6 +131,16 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
                     </AppSurface>
                 </div>
             )}
+        </>
+    );
+
+    return (
+        <>
+            <Button type="button" variant="outline" size={compact ? 'icon' : 'sm'} onClick={startInstall} title={t('Install App')} aria-label={t('Install App')}>
+                <Download className={compact ? 'h-4 w-4' : 'mr-2 h-4 w-4'} />
+                {!compact && t('Install App')}
+            </Button>
+            {typeof document === 'undefined' ? overlays : createPortal(overlays, document.body)}
         </>
     );
 };

@@ -184,4 +184,39 @@
   .pb-safe {
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .app-dialog-panel {
+    max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+
+  .install-offer-panel {
+    bottom: calc(5.75rem + env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 7rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+
+  .seo-fallback {
+    @apply mx-auto flex min-h-screen max-w-4xl flex-col justify-center gap-5 px-6 py-12 text-foreground;
+  }
+
+  .seo-fallback h1 {
+    @apply text-4xl font-extrabold tracking-tight sm:text-5xl;
+  }
+
+  .seo-fallback p {
+    @apply max-w-2xl text-base leading-7 text-muted-foreground;
+  }
+
+  .seo-fallback nav {
+    @apply flex flex-wrap gap-3 pt-3;
+  }
+
+  .seo-fallback a {
+    @apply rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent;
+  }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle, Download, FileText, Loader2, ScanText, Trash2, Upload, X } from 'lucide-react';
 import { collection, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { useParams } from 'react-router-dom';
@@ -45,9 +45,10 @@ const confidenceTone = (confidence: number) => {
     return 'rose';
 };
 
-export const DocumentManager = () => {
+export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number }) => {
     const { id: vehicleId } = useParams<{ id: string }>();
     const { user } = useAuth();
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [documents, setDocuments] = useState<Document[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -79,11 +80,20 @@ export const DocumentManager = () => {
             })) as Document[];
 
             setDocuments(docsData.sort((a, b) => (b.uploadedAt?.seconds || 0) - (a.uploadedAt?.seconds || 0)));
+            setError('');
+            setLoading(false);
+        }, (listenerError) => {
+            console.error('Document listener failed', listenerError);
+            setError('Documents could not be loaded. Please check your account permissions and try again.');
             setLoading(false);
         });
 
         return unsubscribe;
     }, [vehicleId]);
+
+    useEffect(() => {
+        if (quickAddToken > 0) fileInputRef.current?.click();
+    }, [quickAddToken]);
 
     const suggestionsByKey = useMemo(() => {
         const map = new Map<OcrFieldKey, number>();
@@ -252,6 +262,7 @@ export const DocumentManager = () => {
                     <input
                         type="file"
                         id="file-upload"
+                        ref={fileInputRef}
                         className="hidden"
                         onChange={handleFileSelected}
                         accept=".pdf,.jpg,.jpeg,.png"

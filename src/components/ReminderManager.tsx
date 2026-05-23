@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Bell, Plus, Calendar, CheckCircle, Trash2, Clock, AlertTriangle, Loader2 } from 'lucide-react';
+import { Bell, Plus, Calendar, CheckCircle, Trash2, Clock, AlertTriangle, Loader2, Pencil } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { AppSurface, EmptyState, StatusPill } from './ui/design-system';
@@ -30,10 +30,12 @@ export const ReminderManager = ({
     ownerType = 'personal',
     ownerId,
     organizationId,
+    quickAddToken = 0,
 }: {
     ownerType?: 'personal' | 'organization';
     ownerId?: string;
     organizationId?: string;
+    quickAddToken?: number;
 }) => {
     const { id: vehicleId } = useParams<{ id: string }>();
     const { user } = useAuth();
@@ -42,6 +44,7 @@ export const ReminderManager = ({
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const [isAdding, setIsAdding] = useState(false);
+    const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
     
     // Form state
     const [title, setTitle] = useState('');
@@ -51,8 +54,41 @@ export const ReminderManager = ({
     const [recurrence, setRecurrence] = useState<'none' | 'yearly' | 'monthly' | 'biennial'>('none');
     const [processing, setProcessing] = useState(false);
 
+    const resetForm = () => {
+        setEditingReminder(null);
+        setTitle('');
+        setDate('');
+        setType('other');
+        setLeadTimeDays('14');
+        setRecurrence('none');
+    };
+
+    const openCreateForm = () => {
+        if (isAdding && !editingReminder) {
+            setIsAdding(false);
+            resetForm();
+            return;
+        }
+
+        resetForm();
+        setIsAdding(true);
+    };
+
+    const openEditForm = (reminder: Reminder) => {
+        setEditingReminder(reminder);
+        setTitle(reminder.title || '');
+        setType(reminder.type || 'other');
+        setDate(reminder.dueDate?.toDate?.().toISOString().slice(0, 10) || '');
+        setLeadTimeDays(String(reminder.leadTimeDays ?? 14));
+        setRecurrence(reminder.recurrence || 'none');
+        setIsAdding(true);
+    };
+
     useEffect(() => {
-        if (!vehicleId || !user) return;
+        if (!vehicleId || !user) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
 
         const constraints = ownerType === 'organization' && ownerId
@@ -92,6 +128,11 @@ export const ReminderManager = ({
     }, [ownerId, ownerType, user, vehicleId]);
 
     useEffect(() => {
+        if (quickAddToken > 0) openCreateForm();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quickAddToken]);
+
+    useEffect(() => {
         if (!vehicleId) return;
         const unsubscribe = onSnapshot(doc(db, 'vehicles', vehicleId), (snapshot) => {
             setVehicle(snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Vehicle) : null);
@@ -128,34 +169,40 @@ export const ReminderManager = ({
         return [...explicitReminders, ...derived].sort((a, b) => (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0));
     }, [reminders, vehicleDeadlineItems]);
 
-    const handleAdd = async (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!vehicleId || !user) return;
 
         setProcessing(true);
         try {
-            await addDoc(collection(db, 'reminders'), {
-                userId: user.uid,
-                ownerType,
-                ownerId: ownerId || user.uid,
-                organizationId: organizationId || null,
-                vehicleId,
+            const payload = {
                 title,
                 type,
                 dueDate: Timestamp.fromDate(new Date(date)),
                 leadTimeDays: leadTimeDays ? parseInt(leadTimeDays) : 14,
                 recurrence,
-                completed: false,
-                createdAt: serverTimestamp()
-            });
+                updatedAt: serverTimestamp(),
+            };
+
+            if (editingReminder) {
+                await updateDoc(doc(db, 'reminders', editingReminder.id), payload);
+            } else {
+                await addDoc(collection(db, 'reminders'), {
+                    userId: user.uid,
+                    ownerType,
+                    ownerId: ownerId || user.uid,
+                    organizationId: organizationId || null,
+                    vehicleId,
+                    ...payload,
+                    completed: false,
+                    createdAt: serverTimestamp()
+                });
+            }
+
             setIsAdding(false);
-            setTitle('');
-            setDate('');
-            setType('other');
-            setLeadTimeDays('14');
-            setRecurrence('none');
+            resetForm();
         } catch {
-            console.error('Reminder creation failed');
+            console.error('Reminder save failed');
         } finally {
             setProcessing(false);
         }
@@ -193,31 +240,34 @@ export const ReminderManager = ({
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-foreground">Active Reminders</h3>
-                <Button onClick={() => setIsAdding(!isAdding)} variant="outline" size="sm">
+                <Button onClick={openCreateForm} variant="outline" size="sm">
                     {isAdding ? 'Cancel' : <><Plus className="w-4 h-4 mr-2" /> Add Reminder</>}
                 </Button>
             </div>
 
             {isAdding && (
                 <AppSurface className="p-4">
-                    <form onSubmit={handleAdd} className="space-y-4">
-                        <div className="flex gap-2 overflow-x-auto pb-1">
-                            {reminderTemplates.map((template) => (
-                                <button
-                                    key={template.label}
-                                    type="button"
-                                    onClick={() => {
-                                        setTitle(template.title);
-                                        setType(template.type);
-                                        setLeadTimeDays(String(template.leadTimeDays));
-                                        setRecurrence(template.recurrence);
-                                    }}
-                                    className="shrink-0 rounded-xl border border-border bg-background/60 px-3 py-2 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                                >
-                                    {template.label}
-                                </button>
-                            ))}
-                        </div>
+                    <form onSubmit={handleSave} className="space-y-4">
+                        <h4 className="font-bold">{editingReminder ? 'Edit Reminder' : 'Add Reminder'}</h4>
+                        {!editingReminder && (
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                                {reminderTemplates.map((template) => (
+                                    <button
+                                        key={template.label}
+                                        type="button"
+                                        onClick={() => {
+                                            setTitle(template.title);
+                                            setType(template.type);
+                                            setLeadTimeDays(String(template.leadTimeDays));
+                                            setRecurrence(template.recurrence);
+                                        }}
+                                        className="shrink-0 rounded-xl border border-border bg-background/60 px-3 py-2 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                    >
+                                        {template.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <Input
                                 placeholder="Title (e.g., Insurance Renewal)"
@@ -265,7 +315,7 @@ export const ReminderManager = ({
                             </div>
                         </div>
                         <div className="flex justify-end">
-                            <Button type="submit" isLoading={processing}>Save Reminder</Button>
+                            <Button type="submit" isLoading={processing}>{editingReminder ? 'Update Reminder' : 'Save Reminder'}</Button>
                         </div>
                     </form>
                 </AppSurface>
@@ -309,6 +359,13 @@ export const ReminderManager = ({
                                 </div>
                                 {reminder.source !== 'vehicle' && (
                                     <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => openEditForm(reminder)}
+                                            className="p-2 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded-full transition-colors"
+                                            title="Edit"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
                                         <button
                                             onClick={() => handleComplete(reminder.id)}
                                             className="p-2 hover:bg-green-500/10 text-muted-foreground hover:text-green-500 rounded-full transition-colors"

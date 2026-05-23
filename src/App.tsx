@@ -8,6 +8,7 @@ import './i18n';
 const Auth = lazy(() => import('./pages/Auth').then((module) => ({ default: module.Auth })));
 const BusinessDashboard = lazy(() => import('./pages/BusinessDashboard').then((module) => ({ default: module.BusinessDashboard })));
 const BusinessHome = lazy(() => import('./pages/BusinessHome').then((module) => ({ default: module.BusinessHome })));
+const BusinessLanding = lazy(() => import('./pages/BusinessLanding').then((module) => ({ default: module.BusinessLanding })));
 const BusinessVehicleDetails = lazy(() => import('./pages/BusinessVehicleDetails').then((module) => ({ default: module.BusinessVehicleDetails })));
 const CalendarPage = lazy(() => import('./pages/CalendarPage').then((module) => ({ default: module.CalendarPage })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
@@ -42,6 +43,7 @@ function App() {
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/business-fleet" element={<BusinessLanding />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/privacy" element={<LegalPage type="privacy" />} />
               <Route path="/cookies" element={<LegalPage type="cookies" />} />

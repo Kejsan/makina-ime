@@ -588,7 +588,7 @@ export const BusinessDashboard = () => {
 
             {isVehicleModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="max-h-[92vh] w-full max-w-2xl overflow-y-auto p-6">
+                    <AppSurface className="app-dialog-panel w-full max-w-2xl p-6">
                         <h2 className="mb-5 text-xl font-bold">Add business vehicle</h2>
                         <form onSubmit={createVehicle} className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -623,7 +623,7 @@ export const BusinessDashboard = () => {
 
             {isInviteOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="w-full max-w-md p-6">
+                    <AppSurface className="app-dialog-panel w-full max-w-md p-6">
                         <h2 className="mb-5 text-xl font-bold">Invite team member</h2>
                         <form onSubmit={sendInvite} className="space-y-4">
                             <Input label="Email" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} required />
@@ -644,7 +644,7 @@ export const BusinessDashboard = () => {
 
             {isVendorOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="w-full max-w-lg p-6">
+                    <AppSurface className="app-dialog-panel w-full max-w-lg p-6">
                         <h2 className="mb-5 text-xl font-bold">Add vendor</h2>
                         <form onSubmit={createVendor} className="space-y-4">
                             <Input label="Vendor name" value={vendorForm.name} onChange={(event) => setVendorForm({ ...vendorForm, name: event.target.value })} required />

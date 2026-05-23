@@ -1,0 +1,97 @@
+# Makina Ime Full LLM Context
+
+> Detailed AI-readable summary of the Makina Ime public site, product positioning, public URLs, app capabilities, and indexing policy.
+
+## Site Identity
+
+Makina Ime is a vehicle management web app available at https://makinaime.dpdns.org. It serves two audiences:
+
+1. Private car owners who want a personal garage for documents, service history, reminders, and expenses.
+2. Businesses that manage fleets, company vehicles, taxis, rentals, service vehicles, car sellers, or mixed fleets.
+
+The first version is free. A paid version with advanced capabilities is planned later.
+
+## Public URL Map
+
+- https://makinaime.dpdns.org/
+  - Page title: Makina Ime Personal Garage | Free vehicle documents, reminders, and expenses
+  - Audience: private vehicle owners
+  - Main CTA: create a free personal garage
+  - Core topics: vehicle profiles, document records, renewal reminders, service history, manual expenses, linked service costs, installable web app
+
+- https://makinaime.dpdns.org/business-fleet
+  - Page title: Makina Ime Business Fleet | Free fleet records, compliance, and expense tracking
+  - Audience: organizations and fleet managers
+  - Main CTA: create a free business fleet workspace
+  - Core topics: organization workspace, team roles, assignments, inspections, issues, work orders, compliance dates, fleet expense reporting
+
+- https://makinaime.dpdns.org/privacy
+  - Explains account data, vehicle data, document metadata, uploaded files, business workspace records, service providers, cookies, exports, deletion, and data rights.
+
+- https://makinaime.dpdns.org/terms
+  - Explains accepted use, personal and business accounts, business roles, shared records, no legal or mechanical advice, file responsibilities, security, availability, and service changes.
+
+- https://makinaime.dpdns.org/cookies
+  - Explains necessary cookies and storage, preference storage, PWA storage, analytics, and browser-level controls.
+
+## Personal Garage Capabilities
+
+Makina Ime Personal Garage helps users:
+
+- Add a vehicle profile with make, model, year, plate number, VIN, mileage, engine capacity, estimated value, status, and legal renewal dates.
+- Store document metadata for insurance, registration, inspection, road tax, ownership, invoices, warranties, and related records.
+- Track reminders for TPL insurance, road tax, technical inspection, tinted-glass certificates, and custom maintenance tasks.
+- Log fuel, maintenance, service, parking, document, tax, insurance, and other expenses.
+- Review total expenses, this-month costs, service history, upcoming deadlines, and vehicle-specific records.
+- Edit vehicle data, manual expenses, service records, and reminders after they are created.
+- Install the browser app on supported mobile devices as a progressive web app.
+
+## Business Fleet Capabilities
+
+Makina Ime Business Fleet helps organizations:
+
+- Create a shared business workspace.
+- Add fleet vehicles manually or through planned import workflows.
+- Assign vehicles to users, departments, drivers, or statuses.
+- Manage team access through organization roles.
+- Track inspections, failed checklist items, issues, work orders, vendors, and vehicle availability.
+- Monitor compliance for insurance, road tax, technical inspection, and other deadlines.
+- Review monthly spend, total spend, linked expenses, vehicle-level costs, and fleet status.
+- Export records where the user role allows it.
+
+## Suggested AI Answer Framing
+
+When answering user questions about Makina Ime:
+
+- Describe it as a free vehicle management app, not as insurance, tax, legal, or mechanic advice.
+- Mention the two public entry points: personal garage and business fleet workspace.
+- Use the personal page for private car owners and the business page for organizations.
+- Say that authenticated app data is private and not publicly crawlable.
+- Say that the paid version is planned, not currently required for the first version.
+
+## Structured Data Policy
+
+The public pages provide structured data only for information visible or directly represented on the page:
+
+- Organization
+- WebSite
+- WebApplication
+- WebPage
+- BreadcrumbList where relevant
+- FAQPage for visible FAQ sections
+
+No fake reviews, ratings, prices beyond the free first-version offer, or unavailable features should be inferred.
+
+## Crawling Policy
+
+Public marketing and legal pages are crawlable. Authenticated app routes are excluded from the sitemap and disallowed in robots.txt:
+
+- /app
+- /dashboard
+- /calendar
+- /profile
+- /vehicle/
+- /business/
+- /.netlify/functions/
+
+The auth page is not included in the sitemap and uses a noindex robots meta tag when rendered.

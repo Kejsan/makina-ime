@@ -3,6 +3,14 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
 import { AppSurface, StatusPill, ThemeToggle } from '../components/ui/design-system';
 import { PwaInstallButton } from '../components/PwaInstallButton';
+import {
+    Seo,
+    breadcrumbSchema,
+    graphJsonLd,
+    organizationSchema,
+    webPageSchema,
+    websiteSchema,
+} from '../lib/seo';
 import logo from '../assets/Makina Ime Logo.png';
 
 const updatedAt = '20 May 2026';
@@ -19,16 +27,22 @@ const policyMeta = {
     privacy: {
         badge: 'Privacy and data protection',
         title: 'Privacy Policy',
+        description: 'Read the Makina Ime Privacy Policy for personal vehicle and business fleet records, document metadata, reminders, account data, exports, and deletion requests.',
+        path: '/privacy',
         icon: ShieldCheck,
     },
     terms: {
         badge: 'Service terms',
         title: 'Terms and Conditions',
+        description: 'Read the Makina Ime Terms and Conditions for personal vehicle accounts, business fleet workspaces, shared records, files, reminders, and service availability.',
+        path: '/terms',
         icon: FileText,
     },
     cookies: {
         badge: 'Cookie and local storage notice',
         title: 'Cookie Policy',
+        description: 'Read the Makina Ime Cookie Policy covering necessary browser storage, preferences, PWA behavior, analytics, and cookie controls.',
+        path: '/cookies',
         icon: ShieldCheck,
     },
 };
@@ -36,9 +50,20 @@ const policyMeta = {
 export const LegalPage = ({ type }: { type: 'privacy' | 'terms' | 'cookies' }) => {
     const meta = policyMeta[type];
     const Icon = meta.icon;
+    const title = `${meta.title} | Makina Ime`;
+    const structuredData = graphJsonLd([
+        organizationSchema(),
+        websiteSchema(),
+        webPageSchema(meta.path, title, meta.description),
+        breadcrumbSchema([
+            { name: 'Home', path: '/' },
+            { name: meta.title, path: meta.path },
+        ]),
+    ]);
 
     return (
         <div className="min-h-screen bg-background text-foreground">
+            <Seo title={title} description={meta.description} path={meta.path} jsonLd={structuredData} />
             <header className="border-b border-border/80 bg-background/90 backdrop-blur-xl">
                 <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
                     <Link to="/" className="flex items-center gap-3">

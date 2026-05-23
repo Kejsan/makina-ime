@@ -281,7 +281,7 @@ export const CalendarPage = () => {
 
             {isCustomOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="w-full max-w-lg p-6 shadow-2xl">
+                    <AppSurface className="app-dialog-panel w-full max-w-lg p-6 shadow-2xl">
                         <div className="mb-5 flex items-start justify-between gap-4">
                             <div>
                                 <p className="mi-label text-primary">{t('Reminders')}</p>

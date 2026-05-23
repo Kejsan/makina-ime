@@ -28,7 +28,7 @@ export const PageHeader = ({
             <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h1>
             {description && <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}
         </div>
-        {actions && <div className="flex shrink-0 flex-col gap-2 sm:flex-row">{actions}</div>}
+        {actions && <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">{actions}</div>}
     </div>
 );
 
