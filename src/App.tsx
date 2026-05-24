@@ -1,8 +1,9 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LocalizedDom } from './components/LocalizedDom';
 import { ThemeProvider } from './context/ThemeContext';
+import { Seo } from './lib/seo';
 import './i18n';
 
 const Auth = lazy(() => import('./pages/Auth').then((module) => ({ default: module.Auth })));
@@ -20,6 +21,32 @@ const VehicleDetails = lazy(() => import('./pages/VehicleDetails').then((module)
 const LoadingScreen = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
     <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+  </div>
+);
+
+const NotFound = () => (
+  <div className="min-h-screen bg-background text-foreground">
+    <Seo
+      title="Page not found | Makina Ime"
+      description="This Makina Ime page could not be found. Return to the personal vehicle garage or business fleet landing page."
+      path="/404"
+      robots="noindex,follow"
+    />
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-4 py-12">
+      <p className="mi-label mb-3 text-primary">404</p>
+      <h1 className="text-4xl font-extrabold tracking-tight">Page not found</h1>
+      <p className="mt-4 text-sm leading-7 text-muted-foreground">
+        This address does not match a public page or an app workspace route.
+      </p>
+      <div className="mt-7 flex flex-wrap gap-3">
+        <Link to="/" className="inline-flex h-11 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground">
+          Personal garage
+        </Link>
+        <Link to="/business-fleet" className="inline-flex h-11 items-center rounded-xl border border-input px-5 text-sm font-bold">
+          Business fleet
+        </Link>
+      </div>
+    </main>
   </div>
 );
 
@@ -105,6 +132,7 @@ function App() {
                   </PrivateRoute>
                 }
               />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </Router>

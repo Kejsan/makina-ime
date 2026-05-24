@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const SITE_URL = 'https://makinaime.dpdns.org';
 export const SITE_NAME = 'Makina Ime';
@@ -41,6 +42,14 @@ const upsertCanonical = (href: string) => {
         document.head.appendChild(tag);
     }
     tag.href = href;
+};
+
+const localeMap: Record<string, string> = {
+    sq: 'sq_AL',
+    en: 'en_US',
+    it: 'it_IT',
+    de: 'de_DE',
+    es: 'es_ES',
 };
 
 export const graphJsonLd = (nodes: JsonLdNode[]): JsonLdNode => ({
@@ -137,27 +146,30 @@ export const Seo = ({
     robots = 'index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1',
     jsonLd,
 }: SeoProps) => {
+    const { t, i18n } = useTranslation();
     const canonical = absoluteUrl(path);
     const imageUrl = absoluteUrl(image);
     const jsonLdString = jsonLd ? JSON.stringify(jsonLd) : '';
+    const localizedTitle = t(title);
+    const localizedDescription = t(description);
 
     useEffect(() => {
-        document.title = title;
+        document.title = localizedTitle;
 
-        upsertMeta('name', 'description', description);
+        upsertMeta('name', 'description', localizedDescription);
         upsertMeta('name', 'robots', robots);
         upsertMeta('name', 'googlebot', robots);
         upsertMeta('name', 'application-name', SITE_NAME);
         upsertMeta('property', 'og:site_name', SITE_NAME);
-        upsertMeta('property', 'og:title', title);
-        upsertMeta('property', 'og:description', description);
+        upsertMeta('property', 'og:title', localizedTitle);
+        upsertMeta('property', 'og:description', localizedDescription);
         upsertMeta('property', 'og:type', type);
         upsertMeta('property', 'og:url', canonical);
         upsertMeta('property', 'og:image', imageUrl);
-        upsertMeta('property', 'og:locale', 'en_US');
+        upsertMeta('property', 'og:locale', localeMap[i18n.language] || 'en_US');
         upsertMeta('name', 'twitter:card', 'summary_large_image');
-        upsertMeta('name', 'twitter:title', title);
-        upsertMeta('name', 'twitter:description', description);
+        upsertMeta('name', 'twitter:title', localizedTitle);
+        upsertMeta('name', 'twitter:description', localizedDescription);
         upsertMeta('name', 'twitter:image', imageUrl);
         upsertCanonical(canonical);
 
@@ -172,7 +184,7 @@ export const Seo = ({
             script.text = jsonLdString;
             document.head.appendChild(script);
         }
-    }, [canonical, description, imageUrl, jsonLdString, robots, title, type]);
+    }, [canonical, i18n.language, imageUrl, jsonLdString, localizedDescription, localizedTitle, robots, type]);
 
     return null;
 };

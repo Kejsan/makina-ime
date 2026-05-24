@@ -12,6 +12,15 @@ export default defineConfig({
       workbox: {
         clientsClaim: true,
         skipWaiting: true,
+        cleanupOutdatedCaches: true,
+        navigateFallbackDenylist: [
+          /^\/robots\.txt$/,
+          /^\/sitemap\.xml$/,
+          /^\/llms\.txt$/,
+          /^\/llms-full\.txt$/,
+          /^\/manifest\.webmanifest$/,
+          /^\/.*\.(?:xml|txt|json|webmanifest)$/
+        ],
         globIgnores: ['**/ocr-*.js', '**/vendor-ocr-*.js', '**/pdf.worker-*.mjs']
       },
       manifest: {
