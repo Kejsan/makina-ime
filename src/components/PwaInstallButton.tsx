@@ -83,7 +83,7 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
     const overlays = (
         <>
             {showOffer && (
-                <div className="install-offer-panel fixed inset-x-3 z-50 md:hidden">
+                <div className="install-offer-panel fixed inset-x-3 z-50 max-w-[calc(100vw-1.5rem)] overflow-hidden md:hidden">
                     <AppSurface className="border-primary/30 p-4 shadow-2xl">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -94,7 +94,7 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
                                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
                                     {t('Install this app on your phone for faster access and PWA reminders.')}
                                 </p>
-                                <div className="mt-3 flex gap-2">
+                                <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
                                     <Button type="button" size="sm" className="h-9 flex-1" onClick={startInstall}>
                                         {t('Install App')}
                                     </Button>

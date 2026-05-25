@@ -1,8 +1,8 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
-import { AppSurface, StatusPill, ThemeToggle } from '../components/ui/design-system';
-import { PwaInstallButton } from '../components/PwaInstallButton';
+import { AppSurface, StatusPill } from '../components/ui/design-system';
+import { PublicHeader } from '../components/PublicHeader';
 import {
     Seo,
     breadcrumbSchema,
@@ -11,7 +11,6 @@ import {
     webPageSchema,
     websiteSchema,
 } from '../lib/seo';
-import logo from '../assets/Makina Ime Logo.png';
 
 const updatedAt = '20 May 2026';
 const contactEmail = 'infomakinaime@gmail.com';
@@ -64,20 +63,18 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' | 'cookies' }) =
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Seo title={title} description={meta.description} path={meta.path} jsonLd={structuredData} />
-            <header className="border-b border-border/80 bg-background/90 backdrop-blur-xl">
-                <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-                    <Link to="/" className="flex items-center gap-3">
-                        <img src={logo} alt="Makina Ime" className="h-9 w-auto" />
-                    </Link>
-                    <div className="flex items-center gap-2">
-                        <PwaInstallButton compact />
-                        <ThemeToggle />
-                        <Link to="/auth" className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground">
-                            Sign in
-                        </Link>
-                    </div>
-                </div>
-            </header>
+            <PublicHeader
+                tagline="Vehicle records and fleet care"
+                navItems={[
+                    { label: 'Personal garage', to: '/' },
+                    { label: 'Business fleet', to: '/business-fleet' },
+                    { label: 'Privacy', to: '/privacy' },
+                    { label: 'Cookies', to: '/cookies' },
+                    { label: 'Terms', to: '/terms' },
+                ]}
+                primaryCta={{ label: 'Start free', to: '/auth?type=personal&mode=signup' }}
+                alternateCta={{ label: 'Business fleet', to: '/business-fleet' }}
+            />
 
             <main className="mx-auto max-w-4xl px-4 py-10">
                 <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
@@ -91,7 +88,7 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' | 'cookies' }) =
                         {meta.badge}
                     </StatusPill>
                     <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{meta.title}</h1>
-                    <p className="text-sm text-muted-foreground">Last updated: {updatedAt}</p>
+                    <p className="text-sm text-muted-foreground"><span>Last updated:</span> {updatedAt}</p>
                 </div>
 
                 {type === 'privacy' && <PrivacyPolicy />}

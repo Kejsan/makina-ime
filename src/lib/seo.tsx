@@ -154,6 +154,7 @@ export const Seo = ({
     const localizedDescription = t(description);
 
     useEffect(() => {
+        document.documentElement.lang = i18n.language?.slice(0, 2) || 'en';
         document.title = localizedTitle;
 
         upsertMeta('name', 'description', localizedDescription);

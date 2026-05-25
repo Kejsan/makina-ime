@@ -12,8 +12,8 @@ import {
     UploadCloud,
     Wrench,
 } from 'lucide-react';
-import { AppSurface, Panel, StatusPill, ThemeToggle } from '../components/ui/design-system';
-import { PwaInstallButton } from '../components/PwaInstallButton';
+import { AppSurface, Panel, StatusPill } from '../components/ui/design-system';
+import { PublicHeader } from '../components/PublicHeader';
 import {
     Seo,
     faqPageSchema,
@@ -86,33 +86,17 @@ export const Landing = () => {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Seo title={personalTitle} description={personalDescription} path="/" jsonLd={structuredData} />
-            <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-xl">
-                <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-10">
-                    <Link to="/" className="flex items-center gap-3">
-                        <img src={logo} alt="Makina Ime" className="h-10 w-auto" />
-                        <div className="hidden sm:block">
-                            <p className="text-sm font-extrabold">Makina Ime</p>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Personal vehicle care</p>
-                        </div>
-                    </Link>
-                    <nav className="hidden items-center gap-6 text-sm text-muted-foreground lg:flex">
-                        <a href="#features" className="hover:text-foreground">Features</a>
-                        <a href="#benefits" className="hover:text-foreground">Benefits</a>
-                        <a href="#how-it-works" className="hover:text-foreground">How it works</a>
-                        <Link to="/business-fleet" className="hover:text-foreground">For businesses</Link>
-                    </nav>
-                    <div className="flex items-center gap-2">
-                        <PwaInstallButton compact autoOffer />
-                        <ThemeToggle />
-                        <Link to="/auth" className="hidden h-10 items-center justify-center rounded-xl border border-input bg-background/70 px-4 text-sm font-semibold hover:bg-accent sm:inline-flex">
-                            Sign in
-                        </Link>
-                        <Link to="/auth?type=personal&mode=signup" className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90">
-                            Start free
-                        </Link>
-                    </div>
-                </div>
-            </header>
+            <PublicHeader
+                tagline="Personal vehicle care"
+                navItems={[
+                    { label: 'Features', href: '#features' },
+                    { label: 'Benefits', href: '#benefits' },
+                    { label: 'How it works', href: '#how-it-works' },
+                    { label: 'For businesses', to: '/business-fleet' },
+                ]}
+                primaryCta={{ label: 'Start free', to: '/auth?type=personal&mode=signup' }}
+                alternateCta={{ label: 'Business fleet', to: '/business-fleet' }}
+            />
 
             <main>
                 <section className="relative min-h-[86vh] overflow-hidden border-b border-border/80">
@@ -134,6 +118,9 @@ export const Landing = () => {
                                 <Link to="/auth?type=personal&mode=signup" className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-8 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90">
                                     Create your personal garage
                                     <ArrowRight className="ml-2 h-4 w-4" />
+                                </Link>
+                                <Link to="/business-fleet" className="inline-flex h-12 items-center justify-center rounded-xl border border-input bg-background/70 px-8 text-sm font-bold hover:bg-accent">
+                                    Manage a business fleet
                                 </Link>
                             </div>
                             <div className="grid max-w-3xl gap-3 pt-3 sm:grid-cols-3">

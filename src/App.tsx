@@ -1,5 +1,5 @@
-import { lazy, Suspense, type ReactNode } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LocalizedDom } from './components/LocalizedDom';
 import { ThemeProvider } from './context/ThemeContext';
@@ -50,6 +50,23 @@ const NotFound = () => (
   </div>
 );
 
+const ScrollToTop = () => {
+  const { pathname, search, hash } = useLocation();
+
+  useEffect(() => {
+    if (hash) {
+      window.requestAnimationFrame(() => {
+        document.querySelector(hash)?.scrollIntoView({ block: 'start' });
+      });
+      return;
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pathname, search, hash]);
+
+  return null;
+};
+
 // Protected Route Component
 const PrivateRoute = ({ children }: { children: ReactNode }) => {
   const { user, loading } = useAuth();
@@ -67,6 +84,7 @@ function App() {
       <AuthProvider>
         <Router>
           <LocalizedDom />
+          <ScrollToTop />
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/" element={<Landing />} />
