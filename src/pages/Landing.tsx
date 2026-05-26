@@ -83,6 +83,8 @@ const structuredData = graphJsonLd([
 ]);
 
 export const Landing = () => {
+    const currentYear = new Date().getFullYear();
+
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Seo title={personalTitle} description={personalDescription} path="/" jsonLd={structuredData} />
@@ -109,7 +111,11 @@ export const Landing = () => {
                                 Free for personal users
                             </StatusPill>
                             <div className="space-y-4">
-                                <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl">Makina Ime Personal Garage</h1>
+                                <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl">
+                                    <span>Makina Ime</span>
+                                    {' '}
+                                    <span className="block text-primary">Personal Garage</span>
+                                </h1>
                                 <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
                                     A practical car management app for private owners who want documents, renewal dates, service history, reminders, and expenses in one place.
                                 </p>
@@ -256,7 +262,10 @@ export const Landing = () => {
 
             <footer className="border-t border-border/80">
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
-                    <p>Makina Ime. Personal vehicle documents, expenses, services, and reminders.</p>
+                    <p>
+                        <span>&copy; {currentYear} </span>
+                        <span>Makina Ime. Personal vehicle documents, expenses, services, and reminders.</span>
+                    </p>
                     <div className="flex flex-wrap gap-4">
                         <Link to="/business-fleet" className="hover:text-foreground">Business fleets</Link>
                         <Link to="/privacy" className="hover:text-foreground">Privacy</Link>

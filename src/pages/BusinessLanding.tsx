@@ -96,6 +96,8 @@ const structuredData = graphJsonLd([
 ]);
 
 export const BusinessLanding = () => {
+    const currentYear = new Date().getFullYear();
+
     return (
         <div className="min-h-screen bg-background text-foreground">
             <Seo title={businessTitle} description={businessDescription} path="/business-fleet" jsonLd={structuredData} />
@@ -122,7 +124,11 @@ export const BusinessLanding = () => {
                                 Free business workspace, paid version planned
                             </StatusPill>
                             <div className="space-y-4">
-                                <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl">Makina Ime Business Fleet</h1>
+                                <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl">
+                                    <span>Makina Ime</span>
+                                    {' '}
+                                    <span className="block text-primary">Business Fleet</span>
+                                </h1>
                                 <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
                                     A shared vehicle operations workspace for companies that need fleet documents, compliance dates, inspections, work orders, assignments, and expenses under control.
                                 </p>
@@ -284,7 +290,10 @@ export const BusinessLanding = () => {
 
             <footer className="border-t border-border/80">
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
-                    <p>Makina Ime. Business fleet documents, compliance, inspections, work orders, and expenses.</p>
+                    <p>
+                        <span>&copy; {currentYear} </span>
+                        <span>Makina Ime. Business fleet documents, compliance, inspections, work orders, and expenses.</span>
+                    </p>
                     <div className="flex flex-wrap gap-4">
                         <Link to="/" className="hover:text-foreground">Personal users</Link>
                         <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
