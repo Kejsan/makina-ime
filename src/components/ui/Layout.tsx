@@ -17,6 +17,7 @@ import { db } from '../../lib/firebase';
 import { cn } from '../../lib/utils';
 import { NotificationCenter } from '../NotificationCenter';
 import { PwaInstallButton } from '../PwaInstallButton';
+import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../DevelopmentNotice';
 import { ThemeToggle } from './design-system';
 import logo from '../../assets/Makina Ime Logo.png';
 
@@ -121,7 +122,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                             <img src={logo} alt="Makina Ime" className="h-10 w-auto object-contain" />
                             <div>
                                 <p className="text-sm font-extrabold tracking-tight">Makina Ime</p>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pro Dashboard</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">App Dashboard</p>
                             </div>
                         </Link>
 
@@ -148,7 +149,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                                     <p className="truncate text-xs font-semibold">{user?.email}</p>
                                     <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-primary">
                                         <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                                        Secure account
+                                        Signed in
                                     </p>
                                 </div>
                             </div>
@@ -200,6 +201,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
                     <div className="mx-auto max-w-7xl overflow-x-hidden px-4 py-5 pb-28 sm:px-6 md:py-8 md:pb-8 lg:px-10">
                         {children}
+                        <div className="mt-8 grid gap-5">
+                            <DevelopmentDisclaimer />
+                            <PaidPlanInterestForm compact />
+                        </div>
                     </div>
                 </main>
             </div>

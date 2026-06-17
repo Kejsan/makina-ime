@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LocalizedDom } from './components/LocalizedDom';
+import { PublicDevelopmentWarning } from './components/DevelopmentNotice';
 import { ThemeProvider } from './context/ThemeContext';
 import { Seo } from './lib/seo';
 import './i18n';
@@ -85,6 +86,7 @@ function App() {
         <Router>
           <LocalizedDom />
           <ScrollToTop />
+          <PublicDevelopmentWarning />
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/" element={<Landing />} />

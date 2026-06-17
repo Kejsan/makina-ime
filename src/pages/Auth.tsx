@@ -5,6 +5,7 @@ import { Building2, Car, Eye, EyeOff, Lock, Mail, ShieldCheck, Users } from 'luc
 import { Button } from '../components/ui/Button';
 import { AppSurface, Panel, StatusPill, ThemeToggle } from '../components/ui/design-system';
 import { PwaInstallButton } from '../components/PwaInstallButton';
+import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../components/DevelopmentNotice';
 import { useAuth } from '../context/AuthContext';
 import { Seo } from '../lib/seo';
 import logo from '../assets/Makina Ime Logo.png';
@@ -115,7 +116,7 @@ export const Auth = () => {
         <div className="min-h-screen bg-background text-foreground">
             <Seo
                 title="Sign in or create an account | Makina Ime"
-                description="Sign in to Makina Ime or create a free personal vehicle garage or business fleet workspace account."
+                description="Sign in to Makina Ime or create a currently free personal vehicle garage or business fleet workspace account during active development."
                 path="/auth"
                 robots="noindex,follow"
             />
@@ -143,6 +144,7 @@ export const Auth = () => {
                             {flowCopy.body}
                         </p>
                     </div>
+                    <DevelopmentDisclaimer compact />
                     <div className="grid gap-2 rounded-2xl border border-border bg-card/60 p-1 sm:grid-cols-2">
                         {(['personal', 'business'] as const).map((type) => (
                             <button
@@ -288,6 +290,10 @@ export const Auth = () => {
                     </p>
                 </AppSurface>
             </main>
+
+            <section className="mx-auto max-w-6xl px-4 pb-12">
+                <PaidPlanInterestForm />
+            </section>
         </div>
     );
 };

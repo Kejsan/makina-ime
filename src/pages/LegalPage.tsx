@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
 import { AppSurface, StatusPill } from '../components/ui/design-system';
 import { PublicHeader } from '../components/PublicHeader';
+import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../components/DevelopmentNotice';
 import {
     Seo,
     breadcrumbSchema,
@@ -91,9 +92,13 @@ export const LegalPage = ({ type }: { type: 'privacy' | 'terms' | 'cookies' }) =
                     <p className="text-sm text-muted-foreground"><span>Last updated:</span> {updatedAt}</p>
                 </div>
 
+                <DevelopmentDisclaimer className="mb-8" />
+
                 {type === 'privacy' && <PrivacyPolicy />}
                 {type === 'terms' && <TermsPolicy />}
                 {type === 'cookies' && <CookiePolicy />}
+
+                <PaidPlanInterestForm className="mt-8" />
             </main>
         </div>
     );
@@ -135,6 +140,10 @@ const PrivacyPolicy = () => (
 
 const TermsPolicy = () => (
     <AppSurface className="space-y-8 p-6 sm:p-8">
+        <Section title="Development Status And Early Testing">
+            <p>Makina Ime is still under active development and is shared as a work-in-progress project for people who want to try it early. Data protection, data retention, backups, security controls, and uninterrupted access are not guaranteed yet. Do not store sensitive, urgent, or irreplaceable information in the platform.</p>
+            <p>At this stage, Makina Ime and all currently available features are free while development continues. Paid plans are expected later, after a more stable version is reached, with a target window in 2026. Timing, pricing, and included features may change before launch.</p>
+        </Section>
         <Section title="Use Of The Service">
             <p>Makina Ime helps personal users and business organizations manage vehicle documents, service history, expenses, reminders, inspections, issues, work orders, and fleet status. You are responsible for the accuracy of the information you enter and for keeping legally required vehicle documents valid.</p>
         </Section>
@@ -155,7 +164,7 @@ const TermsPolicy = () => (
             <p>You must keep login credentials secure and notify us if you believe your account or business workspace has been accessed without authorization. We may suspend access where needed to protect users, organizations, or the platform.</p>
         </Section>
         <Section title="Availability And Liability">
-            <p>We aim to keep the platform reliable, but we do not guarantee uninterrupted service. To the extent allowed by law, Makina Ime is not liable for missed renewals, expired documents, incorrect records, business downtime, lost sales, missed inspections, or third-party service outages.</p>
+            <p>We aim to keep the platform reliable, but we do not guarantee uninterrupted service, data availability, data safety, backups, or continuous access during this development phase. To the extent allowed by law, Makina Ime and the project owner are not liable for missed renewals, expired documents, incorrect records, business downtime, lost sales, missed inspections, data loss, unauthorized access, or third-party service outages.</p>
         </Section>
         <Section title="Changes To The Service">
             <p>We may improve, change, add, or remove features over time. If changes materially affect user rights or obligations, we will update these terms and revise the last updated date.</p>

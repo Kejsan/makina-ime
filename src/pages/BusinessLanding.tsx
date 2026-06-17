@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { AppSurface, Panel, StatusPill } from '../components/ui/design-system';
 import { PublicHeader } from '../components/PublicHeader';
+import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../components/DevelopmentNotice';
 import {
     Seo,
     breadcrumbSchema,
@@ -61,7 +62,7 @@ const workflow = [
 const faqs = [
     {
         question: 'Is Makina Ime Business Fleet free?',
-        answer: 'Yes. The first business workspace version is free, with advanced paid capabilities planned for a later release.',
+        answer: 'Yes. Makina Ime Business Fleet and all currently available features are free during active development. Paid plans are expected later, after a more stable version is reached, with a target window in 2026.',
     },
     {
         question: 'What types of businesses can use the fleet workspace?',
@@ -121,7 +122,7 @@ export const BusinessLanding = () => {
                         <div className="max-w-3xl space-y-6">
                             <StatusPill tone="amber">
                                 <Building2 className="h-3.5 w-3.5" />
-                                Free business workspace, paid version planned
+                                Free during development, paid plans expected later
                             </StatusPill>
                             <div className="space-y-4">
                                 <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl">
@@ -150,6 +151,7 @@ export const BusinessLanding = () => {
                                     </Panel>
                                 ))}
                             </div>
+                            <DevelopmentDisclaimer className="max-w-3xl" compact />
                         </div>
                         <div className="mt-10 grid max-w-5xl gap-4 md:grid-cols-3">
                             <AppSurface className="p-5">
@@ -277,29 +279,38 @@ export const BusinessLanding = () => {
                 <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-10">
                     <AppSurface className="grid gap-5 p-6 md:grid-cols-[1fr_auto] md:items-center">
                         <div>
-                            <p className="mi-label mb-2 text-primary">Free first version</p>
+                            <p className="mi-label mb-2 text-primary">Free during development</p>
                             <h2 className="text-2xl font-bold tracking-tight">Start building your fleet record system now.</h2>
-                            <p className="mt-2 text-sm text-muted-foreground">This first business version is free. Advanced paid capabilities are planned for a later release.</p>
+                            <p className="mt-2 text-sm text-muted-foreground">All currently available business features are free while Makina Ime is in development. Paid plans are expected later after a more stable release, targeted within 2026.</p>
                         </div>
                         <Link to="/auth?type=business&mode=signup" className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground">
                             Create fleet workspace
                         </Link>
                     </AppSurface>
                 </section>
+
+                <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-10">
+                    <PaidPlanInterestForm />
+                </section>
             </main>
 
             <footer className="border-t border-border/80">
-                <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
-                    <p>
-                        <span>&copy; {currentYear} </span>
-                        <span>Makina Ime. Business fleet documents, compliance, inspections, work orders, and expenses.</span>
-                    </p>
-                    <div className="flex flex-wrap gap-4">
-                        <Link to="/" className="hover:text-foreground">Personal users</Link>
-                        <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-                        <Link to="/cookies" className="hover:text-foreground">Cookies</Link>
-                        <Link to="/terms" className="hover:text-foreground">Terms</Link>
+                <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
+                    <div className="flex flex-col gap-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                        <p>
+                            <span>&copy; {currentYear} </span>
+                            <span>Makina Ime. Business fleet documents, compliance, inspections, work orders, and expenses.</span>
+                        </p>
+                        <div className="flex flex-wrap gap-4">
+                            <Link to="/" className="hover:text-foreground">Personal users</Link>
+                            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+                            <Link to="/cookies" className="hover:text-foreground">Cookies</Link>
+                            <Link to="/terms" className="hover:text-foreground">Terms</Link>
+                        </div>
                     </div>
+                    <p className="mt-5 max-w-4xl text-xs leading-5 text-muted-foreground">
+                        Development notice: Makina Ime is shared as a work-in-progress project for early testing. Data safety and uninterrupted access are not guaranteed yet; use the platform at your own discretion.
+                    </p>
                 </div>
             </footer>
         </div>

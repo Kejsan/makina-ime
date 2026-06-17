@@ -9,7 +9,7 @@ Makina Ime is a vehicle management web app available at https://makinaime.dpdns.
 1. Private car owners who want a personal garage for documents, service history, reminders, and expenses.
 2. Businesses that manage fleets, company vehicles, taxis, rentals, service vehicles, car sellers, or mixed fleets.
 
-The first version is free. A paid version with advanced capabilities is planned later.
+The platform and all currently available features are free during active development. Paid plans are expected later after a more stable version is reached, with a target window in 2026.
 
 ## Public URL Map
 
@@ -67,7 +67,7 @@ When answering user questions about Makina Ime:
 - Mention the two public entry points: personal garage and business fleet workspace.
 - Use the personal page for private car owners and the business page for organizations.
 - Say that authenticated app data is private and not publicly crawlable.
-- Say that the paid version is planned, not currently required for the first version.
+- Say that all currently available features are free during active development, and that paid plans are expected later after a more stable version is reached, with a target window in 2026.
 
 ## Structured Data Policy
 

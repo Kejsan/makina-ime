@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { AppSurface, Panel, StatusPill } from '../components/ui/design-system';
 import { PublicHeader } from '../components/PublicHeader';
+import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../components/DevelopmentNotice';
 import {
     Seo,
     faqPageSchema,
@@ -52,7 +53,7 @@ const workflow = [
 const faqs = [
     {
         question: 'Is Makina Ime free for personal users?',
-        answer: 'Yes. The first version of Makina Ime Personal Garage is free for private vehicle owners, with a paid version planned later for advanced capabilities.',
+        answer: 'Yes. Makina Ime and all currently available features are free during active development. Paid plans are expected later, after a more stable version is reached, with a target window in 2026.',
     },
     {
         question: 'What can I track in a personal garage?',
@@ -137,6 +138,7 @@ export const Landing = () => {
                                     </Panel>
                                 ))}
                             </div>
+                            <DevelopmentDisclaimer className="max-w-3xl" compact />
                         </div>
                         <div className="mt-10 grid max-w-5xl gap-4 md:grid-cols-3">
                             <AppSurface className="p-5">
@@ -249,29 +251,38 @@ export const Landing = () => {
                 <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-10">
                     <AppSurface className="grid gap-5 p-6 md:grid-cols-[1fr_auto] md:items-center">
                         <div>
-                            <p className="mi-label mb-2 text-primary">Free first version</p>
+                            <p className="mi-label mb-2 text-primary">Free during development</p>
                             <h2 className="text-2xl font-bold tracking-tight">Start organizing your vehicle records today.</h2>
-                            <p className="mt-2 text-sm text-muted-foreground">This first version is free for personal users. A paid version with advanced capabilities is planned later.</p>
+                            <p className="mt-2 text-sm text-muted-foreground">All currently available features are free while Makina Ime is in development. Paid plans are expected later after a more stable release, targeted within 2026.</p>
                         </div>
                         <Link to="/auth?type=personal&mode=signup" className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground">
                             Start free
                         </Link>
                     </AppSurface>
                 </section>
+
+                <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-10">
+                    <PaidPlanInterestForm />
+                </section>
             </main>
 
             <footer className="border-t border-border/80">
-                <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
-                    <p>
-                        <span>&copy; {currentYear} </span>
-                        <span>Makina Ime. Personal vehicle documents, expenses, services, and reminders.</span>
-                    </p>
-                    <div className="flex flex-wrap gap-4">
-                        <Link to="/business-fleet" className="hover:text-foreground">Business fleets</Link>
-                        <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-                        <Link to="/cookies" className="hover:text-foreground">Cookies</Link>
-                        <Link to="/terms" className="hover:text-foreground">Terms</Link>
+                <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
+                    <div className="flex flex-col gap-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                        <p>
+                            <span>&copy; {currentYear} </span>
+                            <span>Makina Ime. Personal vehicle documents, expenses, services, and reminders.</span>
+                        </p>
+                        <div className="flex flex-wrap gap-4">
+                            <Link to="/business-fleet" className="hover:text-foreground">Business fleets</Link>
+                            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+                            <Link to="/cookies" className="hover:text-foreground">Cookies</Link>
+                            <Link to="/terms" className="hover:text-foreground">Terms</Link>
+                        </div>
                     </div>
+                    <p className="mt-5 max-w-4xl text-xs leading-5 text-muted-foreground">
+                        Development notice: Makina Ime is shared as a work-in-progress project for early testing. Data safety and uninterrupted access are not guaranteed yet; use the platform at your own discretion.
+                    </p>
                 </div>
             </footer>
         </div>

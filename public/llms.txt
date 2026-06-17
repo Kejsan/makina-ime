@@ -2,7 +2,7 @@
 
 > Free web app for personal vehicle management and business fleet recordkeeping.
 
-Makina Ime helps private car owners and businesses keep vehicle documents, service history, expenses, renewal dates, reminders, inspections, work orders, assignments, and fleet status in one organized browser app. The first version is free, with a paid version planned later for advanced capabilities.
+Makina Ime helps private car owners and businesses keep vehicle documents, service history, expenses, renewal dates, reminders, inspections, work orders, assignments, and fleet status in one organized browser app. The platform and all currently available features are free during active development. Paid plans are expected later after a more stable version is reached, with a target window in 2026.
 
 ## Primary Pages
 
