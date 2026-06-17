@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
-import { Bell, Download, FileText, Globe2, Mail, ShieldCheck, Trash2 } from 'lucide-react';
+import { Bell, Building2, Download, FileText, Globe2, Mail, ShieldCheck, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -52,6 +54,7 @@ const downloadJson = (fileName: string, data: unknown) => {
 
 export const ProfileSettings = () => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const [isExporting, setIsExporting] = useState(false);
     const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
     const [message, setMessage] = useState('');
@@ -204,6 +207,21 @@ export const ProfileSettings = () => {
                         {error || message}
                     </div>
                 )}
+
+                <Link to="/business" className="block">
+                    <AppSurface className="flex flex-col gap-4 p-4 transition-colors hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                <Building2 className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h2 className="font-bold">{t('Business workspace')}</h2>
+                                <p className="mt-1 text-sm text-muted-foreground">{t('Manage shared fleets, inspections, issues, work orders, and business costs.')}</p>
+                            </div>
+                        </div>
+                        <span className="text-sm font-bold text-primary">{t('Open business')}</span>
+                    </AppSurface>
+                </Link>
 
                 <div className="grid gap-4 lg:grid-cols-2">
                     <AppSurface className="p-5 lg:col-span-2">

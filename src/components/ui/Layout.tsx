@@ -47,12 +47,12 @@ const MobileNavItem = ({ icon: Icon, label, href, isActive }: SidebarItemProps) 
     <Link
         to={href}
         className={cn(
-            'flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-semibold transition-colors',
+            'flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold transition-colors',
             isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
         )}
     >
         <Icon className="h-5 w-5" />
-        <span>{label}</span>
+        <span className="max-w-full truncate">{label}</span>
     </Link>
 );
 
@@ -181,6 +181,14 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                             <img src={logo} alt="Makina Ime" className="h-8 w-auto object-contain" />
                         </Link>
                         <div className="flex items-center gap-2">
+                            <Link
+                                to="/business"
+                                aria-label={t('Business')}
+                                title={t('Business')}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-accent/60 text-muted-foreground hover:text-foreground"
+                            >
+                                <Building2 className="h-4 w-4" />
+                            </Link>
                             <PwaInstallButton compact autoOffer />
                             <ThemeToggle className="h-9 w-9" />
                             <div className="relative">
@@ -209,21 +217,20 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 </main>
             </div>
 
-            <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-end justify-around border-t border-border/80 bg-card/95 px-2 py-2 pb-safe backdrop-blur-xl md:hidden">
-                <MobileNavItem icon={LayoutDashboard} label="Paneli" href="/app" isActive={location.pathname === '/app'} />
-                <MobileNavItem icon={Building2} label="Biznes" href="/business" isActive={location.pathname.startsWith('/business')} />
-                <MobileNavItem icon={Car} label="Garazhi" href="/app" isActive={location.pathname.startsWith('/vehicle')} />
+            <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 items-end border-t border-border/80 bg-card/95 px-2 py-2 pb-safe backdrop-blur-xl md:hidden">
+                <MobileNavItem icon={LayoutDashboard} label={t('Paneli')} href="/app" isActive={location.pathname === '/app'} />
+                <MobileNavItem icon={Car} label={t('Garazhi')} href="/app#garage-section" isActive={location.hash === '#garage-section' || location.pathname.startsWith('/vehicle') || /\/business\/[^/]+\/vehicle\//.test(location.pathname)} />
                 <button
                     type="button"
                     onClick={handleQuickAdd}
-                    className="relative -top-5 flex h-14 w-14 items-center justify-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                    aria-label="Add record"
-                    title="Add record"
+                    className="relative -top-5 mx-auto flex h-14 w-14 items-center justify-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                    aria-label={t('Add record')}
+                    title={t('Add record')}
                 >
                     <Plus className="h-6 w-6 stroke-[3]" />
                 </button>
-                <MobileNavItem icon={CalendarDays} label="Kalendari" href="/calendar" isActive={location.pathname === '/calendar'} />
-                <MobileNavItem icon={User} label="Profili" href="/profile" isActive={location.pathname === '/profile'} />
+                <MobileNavItem icon={CalendarDays} label={t('Kalendari')} href="/calendar" isActive={location.pathname === '/calendar'} />
+                <MobileNavItem icon={User} label={t('Profili')} href="/profile" isActive={location.pathname === '/profile'} />
             </nav>
         </div>
     );

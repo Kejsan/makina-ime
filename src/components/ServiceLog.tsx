@@ -9,7 +9,15 @@ import { Wrench, Calendar, Trash2, Plus, Gauge, Pencil } from 'lucide-react';
 import type { ServiceRecord } from '../lib/types';
 import { moneyValue } from '../lib/expenses';
 
-export const ServiceLog = ({ vehicleId, quickAddToken = 0 }: { vehicleId: string; quickAddToken?: number }) => {
+export const ServiceLog = ({
+    vehicleId,
+    quickAddToken = 0,
+    vehicleCurrentMileage = 0,
+}: {
+    vehicleId: string;
+    quickAddToken?: number;
+    vehicleCurrentMileage?: number;
+}) => {
     const { user } = useAuth();
     const [services, setServices] = useState<ServiceRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -149,6 +157,14 @@ export const ServiceLog = ({ vehicleId, quickAddToken = 0 }: { vehicleId: string
                 });
             } else {
                 batch.update(expenseRef, expenseUpdatePayload);
+            }
+
+            if (serviceMileage > (vehicleCurrentMileage || 0) && confirm('Update the vehicle odometer to this service mileage?')) {
+                batch.update(doc(db, 'vehicles', vehicleId), {
+                    currentMileage: serviceMileage,
+                    updatedAt: Timestamp.now(),
+                    updatedBy: user.uid,
+                });
             }
 
             await batch.commit();

@@ -6,6 +6,39 @@ export type OrganizationMemberStatus = 'active' | 'invited' | 'suspended';
 export type BusinessVehicleStatus = 'active' | 'in_service' | 'needs_attention' | 'out_of_service' | 'reserved' | 'sold' | 'archived';
 export type WorkOrderStatus = 'open' | 'scheduled' | 'in_progress' | 'waiting_parts' | 'completed' | 'cancelled';
 export type WorkOrderPriority = 'low' | 'medium' | 'high' | 'critical';
+export type MaintenanceRuleCategory = 'oil' | 'tires' | 'brakes' | 'filters' | 'fluids' | 'timing_belt';
+export type MaintenanceInsightStatus = 'ok' | 'due_soon' | 'overdue' | 'setup_needed';
+export type MaintenanceInsightBasis = 'mileage' | 'date' | 'mileage_and_date' | 'service_history';
+
+export interface VehicleMaintenanceProfile {
+    severeUsage?: boolean;
+    oilIntervalKm?: number;
+    oilIntervalMonths?: number;
+    tireRotationIntervalKm?: number;
+    brakeInspectionIntervalKm?: number;
+    filterIntervalKm?: number;
+    coolantIntervalMonths?: number;
+    timingBeltKnown?: boolean;
+    timingBeltIntervalKm?: number;
+    timingBeltIntervalMonths?: number;
+}
+
+export interface MaintenanceInsight {
+    id: string;
+    category: MaintenanceRuleCategory;
+    status: MaintenanceInsightStatus;
+    titleKey: string;
+    detailKey: string;
+    actionKey: string;
+    basis: MaintenanceInsightBasis;
+    dueMileage?: number;
+    dueDate?: Date;
+    remainingKm?: number;
+    daysRemaining?: number;
+    lastServiceMileage?: number;
+    lastServiceDate?: Date;
+    confidence: 'default' | 'service_history' | 'user_configured';
+}
 
 export interface Vehicle {
     id: string;
@@ -26,6 +59,7 @@ export interface Vehicle {
     location?: string | null;
     notes?: string | null;
     currentMileage?: number;
+    maintenanceProfile?: VehicleMaintenanceProfile;
     registrationExpiry?: Timestamp | null;
     engineCapacity?: number;
     estimatedValue?: number;

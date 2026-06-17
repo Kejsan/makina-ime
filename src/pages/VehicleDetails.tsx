@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, Timestamp } from 'firebase/firestore';
-import { ArrowLeft, Bell, Calendar, Car, DollarSign, FileText, Gauge, Pencil, Wrench, X } from 'lucide-react';
+import { ArrowLeft, Bell, Calendar, Car, DollarSign, FileText, Pencil, Wrench, X } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { Layout } from '../components/ui/Layout';
 import { Button } from '../components/ui/Button';
@@ -12,25 +12,8 @@ import { ServiceLog } from '../components/ServiceLog';
 import { ExpenseTracker } from '../components/ExpenseTracker';
 import { DocumentManager } from '../components/DocumentManager';
 import { ReminderManager } from '../components/ReminderManager';
-
-interface VehicleDetailsData {
-    id: string;
-    make: string;
-    model: string;
-    year: number;
-    plateNumber?: string;
-    vin?: string;
-    currentMileage?: number;
-    registrationExpiry?: Timestamp | null;
-    vehicleType?: string;
-    engineCapacity?: number;
-    estimatedValue?: number;
-    isLuxury?: boolean;
-    technicalInspectionExpiry?: Timestamp | null;
-    tplInsuranceExpiry?: Timestamp | null;
-    roadTaxExpiry?: Timestamp | null;
-    tintedGlassCertificateExpiry?: Timestamp | null;
-}
+import { MaintenanceInsights } from '../components/MaintenanceInsights';
+import type { Vehicle } from '../lib/types';
 
 type VehicleTab = 'overview' | 'services' | 'expenses' | 'documents' | 'reminders';
 
@@ -45,10 +28,11 @@ const tabs: { id: VehicleTab; label: string; icon: React.ElementType }[] = [
 export const VehicleDetails = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const [vehicle, setVehicle] = useState<VehicleDetailsData | null>(null);
+    const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<VehicleTab>('overview');
     const [quickAddToken, setQuickAddToken] = useState(0);
+    const [message, setMessage] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editForm, setEditForm] = useState({
@@ -73,7 +57,7 @@ export const VehicleDetails = () => {
         if (!id) return;
         const unsubscribe = onSnapshot(doc(db, 'vehicles', id), (snapshot) => {
             if (snapshot.exists()) {
-                setVehicle({ id: snapshot.id, ...snapshot.data() } as VehicleDetailsData);
+                setVehicle({ id: snapshot.id, ...snapshot.data() } as Vehicle);
             } else {
                 navigate('/app');
             }
@@ -192,6 +176,8 @@ export const VehicleDetails = () => {
                     }
                 />
 
+                {message && <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">{message}</div>}
+
                 <div className="sticky top-16 z-20 -mx-4 border-y border-border/80 bg-background/95 px-4 py-3 backdrop-blur-xl md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
                     <div className="flex gap-2 overflow-x-auto">
                         {tabs.map((tab) => (
@@ -213,7 +199,8 @@ export const VehicleDetails = () => {
                 </div>
 
                 {activeTab === 'overview' && (
-                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="space-y-5">
+                        <MaintenanceInsights vehicle={vehicle} onMessage={setMessage} />
                         <AppSurface className="p-6">
                             <h2 className="mb-5 text-lg font-bold">Vehicle information</h2>
                             <div className="grid gap-3 sm:grid-cols-2">
@@ -240,32 +227,10 @@ export const VehicleDetails = () => {
                                 ))}
                             </div>
                         </AppSurface>
-
-                        <AppSurface className="p-6">
-                            <h2 className="mb-5 text-lg font-bold">Care status</h2>
-                            <div className="space-y-3">
-                                <Panel className="flex items-center justify-between gap-3 p-4">
-                                    <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <Gauge className="h-4 w-4 text-primary" />
-                                        Mileage
-                                    </span>
-                                    <span className="font-mono font-bold">
-                                        {vehicle.currentMileage ? `${vehicle.currentMileage.toLocaleString()} km` : 'N/A'}
-                                    </span>
-                                </Panel>
-                                <Panel className="flex items-center justify-between gap-3 p-4">
-                                    <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <Bell className="h-4 w-4 text-amber-400" />
-                                        Reminder status
-                                    </span>
-                                    <StatusPill tone="emerald">Active</StatusPill>
-                                </Panel>
-                            </div>
-                        </AppSurface>
                     </div>
                 )}
 
-                {activeTab === 'services' && <ServiceLog vehicleId={id!} quickAddToken={quickAddToken} />}
+                {activeTab === 'services' && <ServiceLog vehicleId={id!} quickAddToken={quickAddToken} vehicleCurrentMileage={vehicle.currentMileage || 0} />}
                 {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} quickAddToken={quickAddToken} />}
                 {activeTab === 'documents' && <DocumentManager quickAddToken={quickAddToken} />}
                 {activeTab === 'reminders' && <ReminderManager quickAddToken={quickAddToken} />}

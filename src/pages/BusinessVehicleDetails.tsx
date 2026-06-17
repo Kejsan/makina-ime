@@ -20,6 +20,7 @@ import { DocumentManager } from '../components/DocumentManager';
 import { ExpenseTracker } from '../components/ExpenseTracker';
 import { ReminderManager } from '../components/ReminderManager';
 import { ServiceLog } from '../components/ServiceLog';
+import { MaintenanceInsights } from '../components/MaintenanceInsights';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import {
@@ -216,52 +217,63 @@ export const BusinessVehicleDetails = () => {
                 </div>
 
                 {activeTab === 'overview' && (
-                    <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-                        <AppSurface className="p-6">
-                            <h2 className="mb-5 text-lg font-bold">Business status</h2>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                {[
-                                    ['Make', vehicle.make],
-                                    ['Model', vehicle.model],
-                                    ['Year', vehicle.year],
-                                    ['Plate', vehicle.plateNumber || 'N/A'],
-                                    ['VIN', vehicle.vin || 'N/A'],
-                                    ['Type', vehicle.vehicleType || 'N/A'],
-                                    ['Assigned driver', vehicle.assignedDriverName || 'Unassigned'],
-                                    ['Department', vehicle.department || 'N/A'],
-                                    ['Mileage', vehicle.currentMileage ? `${vehicle.currentMileage.toLocaleString()} km` : 'N/A'],
-                                    ['Latest inspection', latestInspection ? latestInspection.status : 'No inspection'],
-                                ].map(([label, value]) => (
-                                    <Panel key={label} className="p-4">
-                                        <p className="mi-label">{label}</p>
-                                        <p className="mt-2 break-words font-semibold">{value}</p>
-                                    </Panel>
-                                ))}
-                            </div>
-                        </AppSurface>
+                    <div className="space-y-5">
+                        <MaintenanceInsights
+                            vehicle={vehicle}
+                            ownerType="organization"
+                            ownerId={orgId}
+                            organizationId={orgId}
+                            editable={editable}
+                            canCreateWorkOrder={editable}
+                            onMessage={setMessage}
+                        />
 
-                        <AppSurface className="p-6">
-                            <h2 className="mb-5 text-lg font-bold">Compliance dates</h2>
-                            <div className="space-y-3">
-                                {getVehicleComplianceDeadlines(vehicle).length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No document dates have been added.</p>
-                                ) : (
-                                    getVehicleComplianceDeadlines(vehicle).map((deadline) => (
-                                        <Panel key={deadline.key} className="flex items-center justify-between gap-3 p-4">
-                                            <span className="text-sm text-muted-foreground">{deadline.label}</span>
-                                            <StatusPill tone={deadline.daysRemaining < 0 ? 'rose' : deadline.daysRemaining <= 30 ? 'amber' : 'emerald'}>
-                                                {deadline.daysRemaining < 0 ? 'Expired' : `${deadline.daysRemaining}d`}
-                                            </StatusPill>
+                        <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                            <AppSurface className="p-6">
+                                <h2 className="mb-5 text-lg font-bold">Business status</h2>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    {[
+                                        ['Make', vehicle.make],
+                                        ['Model', vehicle.model],
+                                        ['Year', vehicle.year],
+                                        ['Plate', vehicle.plateNumber || 'N/A'],
+                                        ['VIN', vehicle.vin || 'N/A'],
+                                        ['Type', vehicle.vehicleType || 'N/A'],
+                                        ['Assigned driver', vehicle.assignedDriverName || 'Unassigned'],
+                                        ['Department', vehicle.department || 'N/A'],
+                                        ['Latest inspection', latestInspection ? latestInspection.status : 'No inspection'],
+                                    ].map(([label, value]) => (
+                                        <Panel key={label} className="p-4">
+                                            <p className="mi-label">{label}</p>
+                                            <p className="mt-2 break-words font-semibold">{value}</p>
                                         </Panel>
-                                    ))
-                                )}
-                            </div>
-                        </AppSurface>
+                                    ))}
+                                </div>
+                            </AppSurface>
+
+                            <AppSurface className="p-6">
+                                <h2 className="mb-5 text-lg font-bold">Compliance dates</h2>
+                                <div className="space-y-3">
+                                    {getVehicleComplianceDeadlines(vehicle).length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">No document dates have been added.</p>
+                                    ) : (
+                                        getVehicleComplianceDeadlines(vehicle).map((deadline) => (
+                                            <Panel key={deadline.key} className="flex items-center justify-between gap-3 p-4">
+                                                <span className="text-sm text-muted-foreground">{deadline.label}</span>
+                                                <StatusPill tone={deadline.daysRemaining < 0 ? 'rose' : deadline.daysRemaining <= 30 ? 'amber' : 'emerald'}>
+                                                    {deadline.daysRemaining < 0 ? 'Expired' : `${deadline.daysRemaining}d`}
+                                                </StatusPill>
+                                            </Panel>
+                                        ))
+                                    )}
+                                </div>
+                            </AppSurface>
+                        </div>
                     </div>
                 )}
 
                 {activeTab === 'documents' && <DocumentManager quickAddToken={quickAddToken} />}
-                {activeTab === 'services' && <ServiceLog vehicleId={id!} quickAddToken={quickAddToken} />}
+                {activeTab === 'services' && <ServiceLog vehicleId={id!} quickAddToken={quickAddToken} vehicleCurrentMileage={vehicle.currentMileage || 0} />}
                 {activeTab === 'expenses' && <ExpenseTracker vehicleId={id!} quickAddToken={quickAddToken} />}
                 {activeTab === 'reminders' && <ReminderManager ownerType="organization" ownerId={orgId} organizationId={orgId} quickAddToken={quickAddToken} />}
                 {activeTab === 'inspections' && <InspectionPanel orgId={orgId!} vehicleId={id!} member={member} vehicle={vehicle} inspections={inspections} canSubmit={canSubmit} />}
@@ -351,12 +363,24 @@ const InspectionPanel = ({
             createdAt: serverTimestamp(),
         });
 
+        const inspectionMileage = mileage ? Number(mileage) : 0;
+        const vehicleUpdates: Record<string, unknown> = {};
         if (failedItems.length > 0) {
-            batch.update(doc(db, 'vehicles', vehicleId), {
+            Object.assign(vehicleUpdates, {
                 businessStatus: 'needs_attention',
                 updatedAt: serverTimestamp(),
                 updatedBy: user.uid,
             });
+        }
+        if (inspectionMileage > (vehicle.currentMileage || 0) && confirm('Update the vehicle odometer to this inspection mileage?')) {
+            Object.assign(vehicleUpdates, {
+                currentMileage: inspectionMileage,
+                updatedAt: serverTimestamp(),
+                updatedBy: user.uid,
+            });
+        }
+        if (Object.keys(vehicleUpdates).length > 0) {
+            batch.update(doc(db, 'vehicles', vehicleId), vehicleUpdates);
         }
 
         await batch.commit();

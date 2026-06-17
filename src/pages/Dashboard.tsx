@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     Bell,
+    Building2,
     Calendar,
     Car as CarIcon,
     CreditCard,
@@ -15,7 +16,8 @@ import {
     X,
 } from 'lucide-react';
 import { addDoc, collection, doc, onSnapshot, orderBy, query, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -69,6 +71,7 @@ const expenseCategories = ['Fuel', 'Insurance', 'Tax', 'Parking', 'Tolls', 'Clea
 
 export const Dashboard = () => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [expensesByVehicle, setExpensesByVehicle] = useState<Record<string, ExpenseRecord[]>>({});
@@ -455,6 +458,21 @@ export const Dashboard = () => {
                     <MetricCard icon={CreditCard} label="Total Expenses" value={formatCurrency(totalSpend)} detail={`${formatCurrency(linkedSpend)} from linked records`} tone="indigo" />
                     <MetricCard icon={Bell} label="Afatet" value={dueSoonCount.toString()} detail="Deadlines in 30 days" tone={dueSoonCount > 0 ? 'amber' : 'blue'} />
                 </section>
+
+                <Link to="/business" className="block">
+                    <AppSurface className="flex flex-col gap-4 p-4 transition-colors hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                <Building2 className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h2 className="font-bold">{t('Business workspace')}</h2>
+                                <p className="mt-1 text-sm text-muted-foreground">{t('Manage shared fleets, inspections, issues, work orders, and business costs.')}</p>
+                            </div>
+                        </div>
+                        <span className="text-sm font-bold text-primary">{t('Open business')}</span>
+                    </AppSurface>
+                </Link>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <section id="garage-section" className="space-y-4 lg:col-span-2">
