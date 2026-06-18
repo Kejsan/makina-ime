@@ -176,11 +176,11 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 </aside>
 
                 <main className="min-w-0 flex-1">
-                    <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-border/80 bg-background px-4 pt-safe md:hidden">
-                        <Link to="/app" className="flex items-center gap-2.5">
+                    <header className="sticky top-0 z-30 flex min-h-16 min-w-0 items-center justify-between gap-2 border-b border-border/80 bg-background px-4 pt-safe md:hidden">
+                        <Link to="/app" className="flex min-w-0 items-center gap-2.5">
                             <img src={logo} alt="Makina Ime" width="658" height="658" className="h-8 w-auto object-contain" />
                         </Link>
-                        <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-2">
                             <Link
                                 to="/business"
                                 aria-label={t('Business')}
@@ -207,7 +207,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         </div>
                     </header>
 
-                    <div className="mx-auto max-w-7xl overflow-x-hidden px-4 py-5 pb-28 sm:px-6 md:py-8 md:pb-8 lg:px-10">
+                    <div className="mx-auto min-w-0 max-w-7xl px-4 py-5 pb-28 sm:px-6 md:py-8 md:pb-8 lg:px-10">
                         {children}
                         <div className="mt-8 grid gap-5">
                             <DevelopmentDisclaimer />
@@ -217,7 +217,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 </main>
             </div>
 
-            <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 items-end border-t border-border/80 bg-card px-2 py-2 pb-safe md:hidden">
+            <nav className="px-safe fixed bottom-0 left-0 right-0 z-40 grid min-w-0 grid-cols-5 items-end border-t border-border/80 bg-card py-2 pb-safe md:hidden">
                 <MobileNavItem icon={LayoutDashboard} label={t('Paneli')} href="/app" isActive={location.pathname === '/app'} />
                 <MobileNavItem icon={Car} label={t('Garazhi')} href="/app#garage-section" isActive={location.hash === '#garage-section' || location.pathname.startsWith('/vehicle') || /\/business\/[^/]+\/vehicle\//.test(location.pathname)} />
                 <button

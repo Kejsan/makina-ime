@@ -79,7 +79,7 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
     };
 
     return (
-        <div className="absolute right-0 mt-2 w-80 md:w-96 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 max-h-[calc(100dvh-5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in duration-200 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 sm:max-w-[calc(100dvw-2rem)]">
             <div className="p-4 border-b border-border flex justify-between items-center bg-accent/5">
                 <div className="flex items-center gap-2">
                     <Bell className="w-5 h-5 text-primary" />
@@ -133,8 +133,8 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
                                 )}>
                                     <Clock className="w-4 h-4" />
                                 </div>
-                                <div className="flex-1 pr-6">
-                                    <p className={cn("text-sm font-medium leading-tight mb-1", notif.read ? "text-muted-foreground" : "text-foreground")}>
+                                <div className="min-w-0 flex-1 pr-6">
+                                    <p className={cn("break-words text-sm font-medium leading-tight mb-1", notif.read ? "text-muted-foreground" : "text-foreground")}>
                                         {notif.title}
                                     </p>
                                     <p className="text-xs text-muted-foreground line-clamp-2">

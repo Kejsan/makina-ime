@@ -84,7 +84,7 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
     const overlays = (
         <>
             {showOffer && (
-                <div className="install-offer-panel fixed inset-x-3 z-50 max-w-[calc(100vw-1.5rem)] overflow-hidden md:hidden">
+                <div className="install-offer-panel fixed inset-x-3 z-50 max-w-[calc(100dvw-1.5rem)] overflow-hidden md:hidden">
                     <AppSurface className="border-primary/30 p-4 shadow-2xl">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">

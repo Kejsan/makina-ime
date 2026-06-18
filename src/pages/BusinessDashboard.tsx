@@ -492,9 +492,9 @@ export const BusinessDashboard = () => {
                                 <h2 className="text-xl font-bold">Fleet register</h2>
                                 <p className="text-xs text-muted-foreground">Track readiness, assignments, document state, and cost per vehicle.</p>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
                                 <Filter className="h-4 w-4 text-muted-foreground" />
-                                <select className="mi-field h-10 min-w-44" value={filter} onChange={(event) => setFilter(event.target.value)}>
+                                <select className="mi-field h-10 w-full sm:w-auto sm:min-w-44" value={filter} onChange={(event) => setFilter(event.target.value)}>
                                     <option value="all">All statuses</option>
                                     {businessVehicleStatuses.map((status) => (
                                         <option key={status.value} value={status.value}>{status.label}</option>
@@ -520,7 +520,7 @@ export const BusinessDashboard = () => {
                             <EmptyState icon={Car} title="No vehicles in this view" description="Add vehicles manually or import a CSV with make, model, and year columns." />
                         ) : (
                             <AppSurface className="overflow-hidden p-0">
-                                <div className="overflow-x-auto">
+                                <div className="max-w-full overflow-x-auto" data-overflow-intent="horizontal-table">
                                     <table className="w-full text-left text-sm">
                                         <thead className="border-b border-border/70 text-xs uppercase tracking-wide text-muted-foreground">
                                             <tr>

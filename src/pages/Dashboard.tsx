@@ -656,12 +656,12 @@ export const Dashboard = () => {
                             <h2 className="text-xl font-bold tracking-tight">Regjistri i shpenzimeve</h2>
                             <p className="text-xs text-muted-foreground">Review service fees, document costs, fuel, and independent expenses.</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                             <Filter className="h-4 w-4 text-muted-foreground" />
                             <select
                                 value={selectedVehicleFilter}
                                 onChange={(event) => setSelectedVehicleFilter(event.target.value)}
-                                className="mi-field h-10 min-w-52"
+                                className="mi-field h-10 w-full sm:w-auto sm:min-w-52"
                             >
                                 <option value="all">All vehicles</option>
                                 {vehicles.map((vehicle) => (
@@ -681,7 +681,7 @@ export const Dashboard = () => {
                         {filteredExpenses.length === 0 ? (
                             <EmptyState icon={DollarSign} title="No costs recorded" description="Costs from service records, documents, and manual expenses will appear here." />
                         ) : (
-                            <div className="overflow-x-auto">
+                            <div className="max-w-full overflow-x-auto" data-overflow-intent="horizontal-table">
                                 <table className="w-full text-left text-sm">
                                     <thead className="border-b border-border/70 text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>

@@ -80,14 +80,14 @@ export const Modal = ({
 
     const modal = (
         <div className="mi-modal-scroll fixed inset-0 z-50 overflow-y-auto bg-black/75" role="presentation">
-            <div className="flex min-h-full items-start justify-center p-4 py-[max(1rem,env(safe-area-inset-top))] sm:items-center">
+            <div className="mi-modal-frame flex items-start justify-center sm:items-center">
                 <div
                     ref={panelRef}
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby={titleId}
                     aria-label={titleId ? undefined : 'Dialog'}
-                    className={cn('mi-surface w-full p-6 shadow-2xl', className)}
+                    className={cn('mi-surface w-full min-w-0 max-w-full p-4 shadow-2xl sm:p-6', className)}
                 >
                     {children}
                 </div>
