@@ -272,7 +272,7 @@ export const BusinessHome = () => {
                             const organization = organizations[membership.organizationId];
                             return (
                                 <Link key={membership.id} to={`/business/${membership.organizationId}`}>
-                                    <AppSurface className="h-full p-5 transition-all hover:-translate-y-0.5 hover:border-primary/50">
+                                    <AppSurface className="h-full p-5 transition-[transform,border-color] hover:-translate-y-0.5 hover:border-primary/50">
                                         <div className="mb-5 flex items-start justify-between gap-3">
                                             <div className="rounded-xl bg-primary/10 p-3 text-primary">
                                                 <Building2 className="h-6 w-6" />

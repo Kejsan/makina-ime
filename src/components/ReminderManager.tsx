@@ -10,6 +10,7 @@ import type { Reminder, Vehicle } from '../lib/types';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { getVehicleComplianceDeadlines } from '../lib/business';
+import { isValidDateInput, parseInteger } from '../lib/validation';
 
 const reminderTemplates = [
     { label: 'TPL insurance renewal', title: 'TPL insurance renewal', type: 'insurance', leadTimeDays: 30, recurrence: 'yearly' },
@@ -53,6 +54,7 @@ export const ReminderManager = ({
     const [leadTimeDays, setLeadTimeDays] = useState('14');
     const [recurrence, setRecurrence] = useState<'none' | 'yearly' | 'monthly' | 'biennial'>('none');
     const [processing, setProcessing] = useState(false);
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
     const resetForm = () => {
         setEditingReminder(null);
@@ -61,6 +63,7 @@ export const ReminderManager = ({
         setType('other');
         setLeadTimeDays('14');
         setRecurrence('none');
+        setFormErrors({});
     };
 
     const openCreateForm = () => {
@@ -173,13 +176,22 @@ export const ReminderManager = ({
         e.preventDefault();
         if (!vehicleId || !user) return;
 
+        const leadTime = parseInteger(leadTimeDays || '14', { min: 0, max: 365, required: true });
+        const nextErrors: Record<string, string> = {};
+        if (!title.trim()) nextErrors.title = 'Title is required.';
+        else if (title.trim().length > 120) nextErrors.title = 'Title must be 120 characters or fewer.';
+        if (!isValidDateInput(date)) nextErrors.date = 'Enter a valid due date.';
+        if (leadTime.error) nextErrors.leadTimeDays = leadTime.error;
+        setFormErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0 || leadTime.value === null) return;
+
         setProcessing(true);
         try {
             const payload = {
-                title,
+                title: title.trim(),
                 type,
                 dueDate: Timestamp.fromDate(new Date(date)),
-                leadTimeDays: leadTimeDays ? parseInt(leadTimeDays) : 14,
+                leadTimeDays: leadTime.value,
                 recurrence,
                 updatedAt: serverTimestamp(),
             };
@@ -272,6 +284,8 @@ export const ReminderManager = ({
                             <Input
                                 placeholder="Title (e.g., Insurance Renewal)"
                                 value={title}
+                                maxLength={120}
+                                error={formErrors.title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 required
                             />
@@ -293,15 +307,19 @@ export const ReminderManager = ({
                                 label="Due date"
                                 type="date"
                                 value={date}
+                                error={formErrors.date}
                                 onChange={(e) => setDate(e.target.value)}
                                 required
                             />
                             <Input
                                 label="Lead time (days)"
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={3}
                                 min="0"
                                 max="365"
                                 value={leadTimeDays}
+                                error={formErrors.leadTimeDays}
                                 onChange={(e) => setLeadTimeDays(e.target.value)}
                             />
                             <div className="space-y-2">

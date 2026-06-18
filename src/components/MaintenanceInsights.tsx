@@ -7,6 +7,7 @@ import { db } from '../lib/firebase';
 import { buildMaintenanceInsights, getLatestServiceSnapshot } from '../lib/maintenance';
 import type { MaintenanceInsight, ServiceRecord, Vehicle, WorkspaceOwnerType } from '../lib/types';
 import { cn } from '../lib/utils';
+import { parseInteger, VEHICLE_LIMITS } from '../lib/validation';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { AppSurface, Panel, StatusPill } from './ui/design-system';
@@ -64,6 +65,7 @@ export const MaintenanceInsights = ({
     const [isEditingMileage, setIsEditingMileage] = useState(false);
     const [mileageValue, setMileageValue] = useState(vehicle.currentMileage ? String(vehicle.currentMileage) : '');
     const [savingMileage, setSavingMileage] = useState(false);
+    const [mileageError, setMileageError] = useState('');
     const [actionId, setActionId] = useState('');
 
     useEffect(() => {
@@ -91,10 +93,16 @@ export const MaintenanceInsights = ({
     const saveMileage = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!user || !editable) return;
+        const parsedMileage = parseInteger(mileageValue, { max: VEHICLE_LIMITS.maxMileage });
+        if (parsedMileage.error) {
+            setMileageError(parsedMileage.error);
+            return;
+        }
+        setMileageError('');
         setSavingMileage(true);
         try {
             await updateDoc(doc(db, 'vehicles', vehicle.id), {
-                currentMileage: Number(mileageValue || 0),
+                currentMileage: parsedMileage.value ?? 0,
                 updatedAt: serverTimestamp(),
                 updatedBy: user.uid,
             });
@@ -191,9 +199,11 @@ export const MaintenanceInsights = ({
                                 {isEditingMileage ? (
                                     <form onSubmit={saveMileage} className="flex flex-col gap-2 sm:flex-row">
                                         <Input
-                                            type="number"
-                                            min="0"
+                                            type="text"
+                                            inputMode="numeric"
+                                            maxLength={7}
                                             value={mileageValue}
+                                            error={mileageError}
                                             onChange={(event) => setMileageValue(event.target.value)}
                                             className="h-10"
                                         />

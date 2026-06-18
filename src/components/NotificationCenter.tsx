@@ -122,7 +122,7 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
                         <div 
                             key={notif.id}
                             className={cn(
-                                "p-3 rounded-lg border transition-all duration-200 relative group",
+                                "group relative rounded-lg border p-3 transition-colors duration-200",
                                 notif.read ? "bg-card/50 border-transparent" : "bg-primary/5 border-primary/20"
                             )}
                         >

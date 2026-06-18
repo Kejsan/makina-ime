@@ -23,10 +23,12 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Layout } from '../components/ui/Layout';
+import { Modal } from '../components/ui/Modal';
 import { AppSurface, EmptyState, MetricCard, PageHeader, Panel, StatusPill } from '../components/ui/design-system';
 import type { ExpenseRecord, Reminder } from '../lib/types';
 import { callR2DocumentFunction } from '../lib/r2Documents';
-import { expenseAmount, moneyValue, sumExpenses } from '../lib/expenses';
+import { expenseAmount, sumExpenses } from '../lib/expenses';
+import { isValidDateInput, parseMoney, type FieldErrors, type VehicleField, validateVehicleDraft } from '../lib/validation';
 
 interface Vehicle {
     id: string;
@@ -100,6 +102,7 @@ export const Dashboard = () => {
     const [tplInsuranceExpiry, setTplInsuranceExpiry] = useState('');
     const [roadTaxExpiry, setRoadTaxExpiry] = useState('');
     const [tintedGlassCertificateExpiry, setTintedGlassCertificateExpiry] = useState('');
+    const [vehicleErrors, setVehicleErrors] = useState<FieldErrors<VehicleField>>({});
     const [expenseForm, setExpenseForm] = useState({
         vehicleId: '',
         category: 'Fuel',
@@ -168,21 +171,38 @@ export const Dashboard = () => {
         e.preventDefault();
         if (!user) return;
 
+        const validation = validateVehicleDraft({
+            make,
+            model,
+            year,
+            plateNumber,
+            vin,
+            currentMileage,
+            engineCapacity,
+            estimatedValue,
+        });
+        setVehicleErrors(validation.errors);
+        if (!validation.value) {
+            window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-invalid="true"]')?.focus());
+            return;
+        }
+        const values = validation.value;
+
         try {
             await addDoc(collection(db, 'vehicles'), {
                 userId: user.uid,
                 ownerType: 'personal',
                 ownerId: user.uid,
-                make: make.trim(),
-                model: model.trim(),
-                year: parseInt(year),
-                plateNumber: plateNumber.trim().toUpperCase(),
-                vin: vin.trim().toUpperCase(),
+                make: values.make,
+                model: values.model,
+                year: values.year,
+                plateNumber: values.plateNumber,
+                vin: values.vin,
                 vehicleType,
-                currentMileage: currentMileage ? parseInt(currentMileage) : 0,
+                currentMileage: values.currentMileage,
                 registrationExpiry: expiry ? Timestamp.fromDate(new Date(expiry)) : null,
-                engineCapacity: engineCapacity ? parseInt(engineCapacity) : null,
-                estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
+                engineCapacity: values.engineCapacity,
+                estimatedValue: values.estimatedValue,
                 isLuxury,
                 technicalInspectionExpiry: technicalInspectionExpiry ? Timestamp.fromDate(new Date(technicalInspectionExpiry)) : null,
                 tplInsuranceExpiry: tplInsuranceExpiry ? Timestamp.fromDate(new Date(tplInsuranceExpiry)) : null,
@@ -207,6 +227,7 @@ export const Dashboard = () => {
             setTplInsuranceExpiry('');
             setRoadTaxExpiry('');
             setTintedGlassCertificateExpiry('');
+            setVehicleErrors({});
         } catch {
             console.error('Vehicle creation failed');
         }
@@ -303,6 +324,11 @@ export const Dashboard = () => {
     const handleCreateExpense = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!user || !expenseForm.vehicleId) return;
+        const parsedAmount = parseMoney(expenseForm.amount, { required: true, min: 0.01 });
+        if (parsedAmount.error || parsedAmount.value === null || !isValidDateInput(expenseForm.date)) {
+            setExpenseSaveError(parsedAmount.error || 'Enter a valid expense date.');
+            return;
+        }
 
         try {
             setExpenseSaveError('');
@@ -310,7 +336,7 @@ export const Dashboard = () => {
                 userId: user.uid,
                 vehicleId: expenseForm.vehicleId,
                 category: expenseForm.category,
-                amount: moneyValue(expenseForm.amount),
+                amount: parsedAmount.value,
                 date: Timestamp.fromDate(new Date(expenseForm.date)),
                 notes: expenseForm.notes.trim(),
                 sourceType: 'manual',
@@ -325,10 +351,15 @@ export const Dashboard = () => {
     const handleUpdateExpense = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!editingExpense || !canEditExpense(editingExpense)) return;
+        const amountResult = parseMoney(expenseForm.amount, { required: true, min: 0.01 });
+        if (amountResult.error || amountResult.value === null || !isValidDateInput(expenseForm.date)) {
+            setExpenseSaveError(amountResult.error || 'Enter a valid expense date.');
+            return;
+        }
 
         try {
             setExpenseSaveError('');
-            const parsedAmount = moneyValue(expenseForm.amount);
+            const parsedAmount = amountResult.value;
             const nextDate = Timestamp.fromDate(new Date(expenseForm.date));
             const payload = {
                 category: expenseForm.category,
@@ -517,7 +548,7 @@ export const Dashboard = () => {
                                     return (
                                         <AppSurface
                                             key={vehicle.id}
-                                            className={`cursor-pointer p-5 transition-all hover:-translate-y-0.5 ${isSelected ? 'border-primary ring-2 ring-primary/20' : ''}`}
+                                            className={`cursor-pointer p-5 transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 ${isSelected ? 'border-primary ring-2 ring-primary/20' : ''}`}
                                             onClick={() => navigate(`/vehicle/${vehicle.id}`)}
                                         >
                                             <div className="mb-4 flex items-start justify-between gap-3">
@@ -695,11 +726,10 @@ export const Dashboard = () => {
             </div>
 
             {isVehicleModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="app-dialog-panel w-full max-w-xl p-6 shadow-2xl">
+                <Modal onClose={() => setIsVehicleModalOpen(false)} titleId="add-vehicle-title" className="max-w-xl">
                         <div className="mb-6 flex items-start justify-between gap-4">
                             <div>
-                                <h2 className="flex items-center gap-2 text-xl font-bold">
+                                <h2 id="add-vehicle-title" className="flex items-center gap-2 text-xl font-bold">
                                     <CarIcon className="h-5 w-5 text-primary" />
                                     Shto automjet te ri
                                 </h2>
@@ -712,10 +742,10 @@ export const Dashboard = () => {
 
                         <form onSubmit={handleAddVehicle} className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <Input label="Marka" placeholder="Volkswagen" value={make} onChange={(e) => setMake(e.target.value)} required />
-                                <Input label="Modeli" placeholder="Polo" value={model} onChange={(e) => setModel(e.target.value)} required />
-                                <Input label="Viti" type="number" placeholder="2020" value={year} onChange={(e) => setYear(e.target.value)} required />
-                                <Input label="Targa" placeholder="AA 000 XX" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
+                                <Input label="Marka" placeholder="Volkswagen" value={make} maxLength={80} error={vehicleErrors.make} onChange={(e) => setMake(e.target.value)} required />
+                                <Input label="Modeli" placeholder="Polo" value={model} maxLength={80} error={vehicleErrors.model} onChange={(e) => setModel(e.target.value)} required />
+                                <Input label="Viti" type="text" inputMode="numeric" placeholder="2020" value={year} maxLength={4} error={vehicleErrors.year} onChange={(e) => setYear(e.target.value)} required />
+                                <Input label="Targa" placeholder="AA 000 XX" value={plateNumber} maxLength={15} autoCapitalize="characters" spellCheck={false} error={vehicleErrors.plateNumber} onChange={(e) => setPlateNumber(e.target.value)} />
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -729,8 +759,8 @@ export const Dashboard = () => {
                                         <option value="van">Van</option>
                                     </select>
                                 </div>
-                                <Input label="Kilometrazhi" type="number" placeholder="120000" value={currentMileage} onChange={(e) => setCurrentMileage(e.target.value)} />
-                                <Input label="VIN" placeholder="Vehicle identification number" value={vin} onChange={(e) => setVin(e.target.value)} />
+                                <Input label="Kilometrazhi" type="text" inputMode="numeric" placeholder="120000" value={currentMileage} maxLength={7} error={vehicleErrors.currentMileage} onChange={(e) => setCurrentMileage(e.target.value)} />
+                                <Input label="VIN" placeholder="Vehicle identification number" value={vin} maxLength={17} autoCapitalize="characters" spellCheck={false} error={vehicleErrors.vin} onChange={(e) => setVin(e.target.value)} />
                                 <Input label="Registration / insurance expiry" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
                             </div>
 
@@ -740,8 +770,8 @@ export const Dashboard = () => {
                                     <p className="mt-1 text-xs text-muted-foreground">Optional fields used for reminders, compliance, and ownership records.</p>
                                 </div>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <Input label="Engine capacity (cc)" type="number" placeholder="1598" value={engineCapacity} onChange={(e) => setEngineCapacity(e.target.value)} />
-                                    <Input label="Estimated value (€)" type="number" step="0.01" placeholder="6500" value={estimatedValue} onChange={(e) => setEstimatedValue(e.target.value)} />
+                                    <Input label="Engine capacity (cc)" type="text" inputMode="numeric" placeholder="1598" value={engineCapacity} maxLength={6} error={vehicleErrors.engineCapacity} onChange={(e) => setEngineCapacity(e.target.value)} />
+                                    <Input label="Estimated value (€)" type="text" inputMode="decimal" placeholder="6500" value={estimatedValue} maxLength={13} error={vehicleErrors.estimatedValue} onChange={(e) => setEstimatedValue(e.target.value)} />
                                     <Input label="Technical inspection expiry" type="date" value={technicalInspectionExpiry} onChange={(e) => setTechnicalInspectionExpiry(e.target.value)} />
                                     <Input label="TPL insurance expiry" type="date" value={tplInsuranceExpiry} onChange={(e) => setTplInsuranceExpiry(e.target.value)} />
                                     <Input label="Road tax expiry" type="date" value={roadTaxExpiry} onChange={(e) => setRoadTaxExpiry(e.target.value)} />
@@ -761,16 +791,14 @@ export const Dashboard = () => {
                                 <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => setIsVehicleModalOpen(false)}>Anulo</Button>
                             </div>
                         </form>
-                    </AppSurface>
-                </div>
+                </Modal>
             )}
 
             {(editingExpense || isExpenseCreateOpen) && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="app-dialog-panel w-full max-w-lg p-6 shadow-2xl">
+                <Modal onClose={closeExpenseEditor} titleId="expense-dialog-title" className="max-w-lg">
                         <div className="mb-6 flex items-start justify-between gap-4">
                             <div>
-                                <h2 className="flex items-center gap-2 text-xl font-bold">
+                                <h2 id="expense-dialog-title" className="flex items-center gap-2 text-xl font-bold">
                                     {editingExpense ? <Pencil className="h-5 w-5 text-primary" /> : <DollarSign className="h-5 w-5 text-primary" />}
                                     {editingExpense ? 'Edit Expense' : 'Add Expense'}
                                 </h2>
@@ -820,9 +848,9 @@ export const Dashboard = () => {
                                 </div>
                                 <Input
                                     label="Amount (€)"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
+                                    type="text"
+                                    inputMode="decimal"
+                                    maxLength={13}
                                     value={expenseForm.amount}
                                     onChange={(event) => setExpenseForm({ ...expenseForm, amount: event.target.value })}
                                     required
@@ -836,6 +864,7 @@ export const Dashboard = () => {
                                 />
                                 <Input
                                     label="Notes (Optional)"
+                                    maxLength={500}
                                     value={expenseForm.notes}
                                     onChange={(event) => setExpenseForm({ ...expenseForm, notes: event.target.value })}
                                 />
@@ -845,8 +874,7 @@ export const Dashboard = () => {
                                 <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={closeExpenseEditor}>Cancel</Button>
                             </div>
                         </form>
-                    </AppSurface>
-                </div>
+                </Modal>
             )}
         </Layout>
     );

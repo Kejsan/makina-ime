@@ -23,6 +23,7 @@ import { ServiceLog } from '../components/ServiceLog';
 import { MaintenanceInsights } from '../components/MaintenanceInsights';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
+import { type FieldErrors, type VehicleField, parseInteger, parseMoney, validateVehicleDraft, vehicleRecordErrors, VEHICLE_LIMITS } from '../lib/validation';
 import {
     businessVehicleStatuses,
     canEditFleet,
@@ -170,6 +171,7 @@ export const BusinessVehicleDetails = () => {
     }
 
     if (vehicle.ownerType !== 'organization' || vehicle.ownerId !== orgId) return <Navigate to={`/business/${orgId}`} replace />;
+    const profileNeedsCorrection = Object.keys(vehicleRecordErrors(vehicle)).length > 0;
 
     return (
         <Layout>
@@ -195,15 +197,21 @@ export const BusinessVehicleDetails = () => {
                 />
 
                 {message && <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">{message}</div>}
+                {profileNeedsCorrection && (
+                    <button type="button" onClick={() => setActiveTab('assignment')} className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-left text-sm text-amber-200">
+                        <strong className="block">This vehicle profile needs correction.</strong>
+                        <span className="mt-1 block text-amber-100/80">Review the highlighted fields before making further updates.</span>
+                    </button>
+                )}
 
-                <div className="sticky top-16 z-20 -mx-4 border-y border-border/80 bg-background/95 px-4 py-3 backdrop-blur-xl md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
+                <div className="sticky top-16 z-20 -mx-4 border-y border-border/80 bg-background px-4 py-3 md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
                     <div className="flex gap-2 overflow-x-auto">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+                                className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                                     activeTab === tab.id
                                         ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
                                         : 'border border-border bg-card/60 text-muted-foreground hover:text-foreground'
@@ -303,12 +311,19 @@ const InspectionPanel = ({
     const { user } = useAuth();
     const [isAdding, setIsAdding] = useState(false);
     const [mileage, setMileage] = useState(vehicle.currentMileage ? String(vehicle.currentMileage) : '');
+    const [mileageError, setMileageError] = useState('');
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState(inspectionTemplate.map((label, index) => ({ id: `item-${index}`, label, passed: true, notes: '' })));
 
     const submitInspection = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!user || !member) return;
+        const parsedMileage = parseInteger(mileage, { max: VEHICLE_LIMITS.maxMileage });
+        if (parsedMileage.error) {
+            setMileageError(parsedMileage.error);
+            return;
+        }
+        setMileageError('');
 
         const failedItems = items.filter((item) => !item.passed);
         const inspectionRef = doc(collection(db, 'vehicles', vehicleId, 'inspections'));
@@ -353,7 +368,7 @@ const InspectionPanel = ({
             organizationId: orgId,
             templateName: 'Daily readiness',
             status: failedItems.length > 0 ? 'failed' : 'passed',
-            mileage: mileage ? Number(mileage) : null,
+            mileage: parsedMileage.value,
             inspectedBy: user.uid,
             inspectedByEmail: user.email || null,
             inspectedAt: serverTimestamp(),
@@ -363,7 +378,7 @@ const InspectionPanel = ({
             createdAt: serverTimestamp(),
         });
 
-        const inspectionMileage = mileage ? Number(mileage) : 0;
+        const inspectionMileage = parsedMileage.value ?? 0;
         const vehicleUpdates: Record<string, unknown> = {};
         if (failedItems.length > 0) {
             Object.assign(vehicleUpdates, {
@@ -399,7 +414,7 @@ const InspectionPanel = ({
             {isAdding && (
                 <AppSurface className="p-5">
                     <form onSubmit={submitInspection} className="space-y-4">
-                        <Input label="Mileage" type="number" value={mileage} onChange={(event) => setMileage(event.target.value)} />
+                        <Input label="Mileage" type="text" inputMode="numeric" maxLength={7} value={mileage} error={mileageError} onChange={(event) => setMileage(event.target.value)} />
                         <div className="space-y-3">
                             {items.map((item, index) => (
                                 <Panel key={item.id} className="grid gap-3 p-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
@@ -528,10 +543,17 @@ const WorkOrdersPanel = ({ orgId, vehicleId, workOrders, editable, currency }: {
         cost: '',
         notes: '',
     });
+    const [costError, setCostError] = useState('');
 
     const createWorkOrder = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!user || !editable) return;
+        const parsedCost = parseMoney(form.cost);
+        if (parsedCost.error) {
+            setCostError(parsedCost.error);
+            return;
+        }
+        setCostError('');
         await addDoc(collection(db, 'vehicles', vehicleId, 'workOrders'), {
             vehicleId,
             organizationId: orgId,
@@ -540,7 +562,7 @@ const WorkOrdersPanel = ({ orgId, vehicleId, workOrders, editable, currency }: {
             priority: form.priority,
             status: form.status,
             dueDate: form.dueDate ? Timestamp.fromDate(new Date(form.dueDate)) : null,
-            cost: form.cost ? Number(form.cost) : 0,
+            cost: parsedCost.value ?? 0,
             notes: form.notes.trim() || null,
             createdAt: serverTimestamp(),
             createdBy: user.uid,
@@ -586,7 +608,7 @@ const WorkOrdersPanel = ({ orgId, vehicleId, workOrders, editable, currency }: {
                                 {workOrderStatuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                             </select>
                             <Input label="Due date" type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} />
-                            <Input label="Cost" type="number" value={form.cost} onChange={(event) => setForm({ ...form, cost: event.target.value })} />
+                            <Input label="Cost" type="text" inputMode="decimal" maxLength={13} error={costError} value={form.cost} onChange={(event) => setForm({ ...form, cost: event.target.value })} />
                         </div>
                         <Input label="Notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
                         <Button type="submit">Save work order</Button>
@@ -624,6 +646,11 @@ const WorkOrdersPanel = ({ orgId, vehicleId, workOrders, editable, currency }: {
 const AssignmentPanel = ({ vehicle, editable, onSaved }: { vehicle: Vehicle; editable: boolean; onSaved: () => void }) => {
     const { user } = useAuth();
     const [form, setForm] = useState({
+        make: vehicle.make || '',
+        model: vehicle.model || '',
+        year: String(vehicle.year || ''),
+        plateNumber: vehicle.plateNumber || '',
+        vin: vehicle.vin || '',
         businessStatus: (vehicle.businessStatus || 'active') as BusinessVehicleStatus,
         assignedDriverName: vehicle.assignedDriverName || '',
         department: vehicle.department || '',
@@ -634,16 +661,40 @@ const AssignmentPanel = ({ vehicle, editable, onSaved }: { vehicle: Vehicle; edi
         technicalInspectionExpiry: formatDateInput(vehicle.technicalInspectionExpiry),
         roadTaxExpiry: formatDateInput(vehicle.roadTaxExpiry),
     });
+    const [mileageError, setMileageError] = useState('');
+    const [vehicleErrors, setVehicleErrors] = useState<FieldErrors<VehicleField>>({});
 
     const save = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!user || !editable) return;
+        const validation = validateVehicleDraft({
+            make: form.make,
+            model: form.model,
+            year: form.year,
+            plateNumber: form.plateNumber,
+            vin: form.vin,
+            currentMileage: form.currentMileage,
+            engineCapacity: vehicle.engineCapacity == null ? '' : String(vehicle.engineCapacity),
+            estimatedValue: vehicle.estimatedValue == null ? '' : String(vehicle.estimatedValue),
+        });
+        setVehicleErrors(validation.errors);
+        setMileageError(validation.errors.currentMileage || '');
+        if (!validation.value) {
+            return;
+        }
+        const values = validation.value;
+        setMileageError('');
         await updateDoc(doc(db, 'vehicles', vehicle.id), {
+            make: values.make,
+            model: values.model,
+            year: values.year,
+            plateNumber: values.plateNumber,
+            vin: values.vin,
             businessStatus: form.businessStatus,
             assignedDriverName: form.assignedDriverName.trim() || null,
             department: form.department.trim() || null,
             location: form.location.trim() || null,
-            currentMileage: form.currentMileage ? Number(form.currentMileage) : 0,
+            currentMileage: values.currentMileage,
             registrationExpiry: form.registrationExpiry ? Timestamp.fromDate(new Date(form.registrationExpiry)) : null,
             tplInsuranceExpiry: form.tplInsuranceExpiry ? Timestamp.fromDate(new Date(form.tplInsuranceExpiry)) : null,
             technicalInspectionExpiry: form.technicalInspectionExpiry ? Timestamp.fromDate(new Date(form.technicalInspectionExpiry)) : null,
@@ -658,6 +709,11 @@ const AssignmentPanel = ({ vehicle, editable, onSaved }: { vehicle: Vehicle; edi
         <AppSurface className="p-6">
             <form onSubmit={save} className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
+                    <Input label="Make" maxLength={80} error={vehicleErrors.make} value={form.make} onChange={(event) => setForm({ ...form, make: event.target.value })} disabled={!editable} />
+                    <Input label="Model" maxLength={80} error={vehicleErrors.model} value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} disabled={!editable} />
+                    <Input label="Year" type="text" inputMode="numeric" maxLength={4} error={vehicleErrors.year} value={form.year} onChange={(event) => setForm({ ...form, year: event.target.value })} disabled={!editable} />
+                    <Input label="Plate number" maxLength={15} error={vehicleErrors.plateNumber} value={form.plateNumber} onChange={(event) => setForm({ ...form, plateNumber: event.target.value })} disabled={!editable} />
+                    <Input label="VIN" maxLength={17} error={vehicleErrors.vin} value={form.vin} onChange={(event) => setForm({ ...form, vin: event.target.value })} disabled={!editable} />
                     <div className="space-y-2">
                         <label className="mi-label">Lifecycle status</label>
                         <select className="mi-field" value={form.businessStatus} onChange={(event) => setForm({ ...form, businessStatus: event.target.value as BusinessVehicleStatus })} disabled={!editable}>
@@ -667,7 +723,7 @@ const AssignmentPanel = ({ vehicle, editable, onSaved }: { vehicle: Vehicle; edi
                     <Input label="Assigned driver" value={form.assignedDriverName} onChange={(event) => setForm({ ...form, assignedDriverName: event.target.value })} disabled={!editable} />
                     <Input label="Department" value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} disabled={!editable} />
                     <Input label="Location" value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} disabled={!editable} />
-                    <Input label="Current mileage" type="number" value={form.currentMileage} onChange={(event) => setForm({ ...form, currentMileage: event.target.value })} disabled={!editable} />
+                    <Input label="Current mileage" type="text" inputMode="numeric" maxLength={7} error={mileageError} value={form.currentMileage} onChange={(event) => setForm({ ...form, currentMileage: event.target.value })} disabled={!editable} />
                     <Input label="Registration expiry" type="date" value={form.registrationExpiry} onChange={(event) => setForm({ ...form, registrationExpiry: event.target.value })} disabled={!editable} />
                     <Input label="TPL insurance expiry" type="date" value={form.tplInsuranceExpiry} onChange={(event) => setForm({ ...form, tplInsuranceExpiry: event.target.value })} disabled={!editable} />
                     <Input label="Technical inspection expiry" type="date" value={form.technicalInspectionExpiry} onChange={(event) => setForm({ ...form, technicalInspectionExpiry: event.target.value })} disabled={!editable} />

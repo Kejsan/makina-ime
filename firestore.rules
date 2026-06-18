@@ -76,7 +76,12 @@ service cloud.firestore {
     }
 
     function validBusinessSettingsData() {
-      return request.resource.data.keys().hasOnly(['defaultReminderLeadTimeDays', 'inspectionFailureCreatesWorkOrder', 'preferredCurrency', 'createdAt', 'updatedAt']);
+      return request.resource.data.keys().hasOnly(['defaultReminderLeadTimeDays', 'inspectionFailureCreatesWorkOrder', 'preferredCurrency', 'createdAt', 'updatedAt'])
+        && request.resource.data.defaultReminderLeadTimeDays is int
+        && request.resource.data.defaultReminderLeadTimeDays >= 0
+        && request.resource.data.defaultReminderLeadTimeDays <= 365
+        && request.resource.data.inspectionFailureCreatesWorkOrder is bool
+        && request.resource.data.preferredCurrency in ['EUR', 'ALL'];
     }
 
     function canAcceptInvite(orgId, role) {
@@ -90,6 +95,82 @@ service cloud.firestore {
 
     function isPersonalVehicleData(data) {
       return !('ownerType' in data) || data.ownerType == 'personal';
+    }
+
+    function validOptionalString(data, key, maxLength) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= maxLength);
+    }
+
+    function validOptionalTimestamp(data, key) {
+      return !(key in data) || data[key] == null || data[key] is timestamp;
+    }
+
+    function validVehicleData(data) {
+      let plate = data.get('plateNumber', '');
+      let vin = data.get('vin', '');
+      let mileage = data.get('currentMileage', 0);
+      return data.make is string && data.make.size() > 0 && data.make.size() <= 80
+        && data.model is string && data.model.size() > 0 && data.model.size() <= 80
+        && data.year is int && data.year >= 1886 && data.year <= request.time.year() + 1
+        && plate is string && plate.size() <= 15
+        && (plate == '' || (plate.matches('^[A-Z0-9][A-Z0-9 -]{0,13}[A-Z0-9]$') && plate.matches('.*[A-Z].*') && plate.matches('.*[0-9].*')))
+        && vin is string && (vin == '' || vin.matches('^[A-HJ-NPR-Z0-9]{17}$'))
+        && mileage is int && mileage >= 0 && mileage <= 9999999
+        && (!('engineCapacity' in data) || data.engineCapacity == null || (data.engineCapacity is int && data.engineCapacity >= 1 && data.engineCapacity <= 100000))
+        && (!('estimatedValue' in data) || data.estimatedValue == null || (data.estimatedValue is number && data.estimatedValue >= 0 && data.estimatedValue <= 1000000000))
+        && (!('vehicleType' in data) || data.vehicleType in ['car', 'suv', 'motorcycle', 'truck', 'van'])
+        && (!('businessStatus' in data) || data.businessStatus in ['active', 'in_service', 'reserved', 'needs_attention', 'out_of_service', 'sold', 'archived'])
+        && validOptionalString(data, 'assignedDriverName', 120)
+        && validOptionalString(data, 'department', 120)
+        && validOptionalString(data, 'location', 160)
+        && validOptionalTimestamp(data, 'registrationExpiry')
+        && validOptionalTimestamp(data, 'technicalInspectionExpiry')
+        && validOptionalTimestamp(data, 'tplInsuranceExpiry')
+        && validOptionalTimestamp(data, 'roadTaxExpiry')
+        && validOptionalTimestamp(data, 'tintedGlassCertificateExpiry');
+    }
+
+    function validExpenseData(data) {
+      return data.category is string && data.category.size() > 0 && data.category.size() <= 80
+        && data.amount is number && data.amount >= 0 && data.amount <= 1000000000
+        && data.date is timestamp
+        && validOptionalString(data, 'notes', 500);
+    }
+
+    function validServiceData(data) {
+      return data.description is string && data.description.size() > 0 && data.description.size() <= 200
+        && data.date is timestamp
+        && data.cost is number && data.cost >= 0 && data.cost <= 1000000000
+        && data.mileage is int && data.mileage >= 0 && data.mileage <= 9999999;
+    }
+
+    function validReminderData(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 120
+        && data.dueDate is timestamp
+        && data.leadTimeDays is int && data.leadTimeDays >= 0 && data.leadTimeDays <= 365
+        && data.recurrence in ['none', 'monthly', 'yearly', 'biennial'];
+    }
+
+    function validInspectionData(data) {
+      return data.status in ['passed', 'failed']
+        && (!('mileage' in data) || data.mileage == null || (data.mileage is int && data.mileage >= 0 && data.mileage <= 9999999))
+        && validOptionalString(data, 'notes', 1000);
+    }
+
+    function validIssueData(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.status in ['open', 'resolved']
+        && data.priority in ['low', 'medium', 'high', 'critical']
+        && validOptionalString(data, 'description', 1000);
+    }
+
+    function validWorkOrderData(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.status in ['open', 'scheduled', 'in_progress', 'waiting_parts', 'completed', 'cancelled']
+        && data.priority in ['low', 'medium', 'high', 'critical']
+        && (!('cost' in data) || data.cost == null || (data.cost is number && data.cost >= 0 && data.cost <= 1000000000))
+        && validOptionalTimestamp(data, 'dueDate')
+        && validOptionalString(data, 'notes', 1000);
     }
 
     function canReadVehicleData(data) {
@@ -209,7 +290,7 @@ service cloud.firestore {
     }
 
     match /vehicles/{vehicleId} {
-      allow create: if (
+      allow create: if ((
           request.resource.data.ownerType == 'organization'
           && request.resource.data.ownerId == request.resource.data.organizationId
           && canEditOrg(request.resource.data.ownerId)
@@ -217,29 +298,29 @@ service cloud.firestore {
         ) || (
           isPersonalVehicleData(request.resource.data)
           && isOwner(request.resource.data.userId)
-        );
+        )) && validVehicleData(request.resource.data);
       allow read: if canReadVehicleData(resource.data);
       allow delete: if false;
-      allow update: if canEditVehicleData(resource.data) && vehicleOwnerUnchanged();
+      allow update: if canEditVehicleData(resource.data) && vehicleOwnerUnchanged() && validVehicleData(request.resource.data);
 
       match /services/{serviceId} {
         allow read: if ownsVehicle(vehicleId);
         allow delete: if canEditVehicle(vehicleId);
-        allow create: if canDriverVehicle(vehicleId)
+        allow create: if canDriverVehicle(vehicleId) && validServiceData(request.resource.data)
           && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid);
-        allow update: if canEditVehicle(vehicleId)
+        allow update: if canEditVehicle(vehicleId) && validServiceData(request.resource.data)
           && (!('userId' in resource.data) || request.resource.data.userId == resource.data.userId);
       }
 
       match /expenses/{expenseId} {
         allow read: if ownsVehicle(vehicleId);
         allow delete: if canEditVehicle(vehicleId) && canDeleteClientExpense();
-        allow create: if canDriverVehicle(vehicleId)
+        allow create: if canDriverVehicle(vehicleId) && validExpenseData(request.resource.data)
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.vehicleId == vehicleId
           && validLinkedSourceCreate()
           && request.resource.data.keys().hasOnly(['userId', 'vehicleId', 'category', 'amount', 'date', 'notes', 'sourceType', 'sourceId', 'sourceLabel', 'createdAt']);
-        allow update: if canUpdateClientExpense(vehicleId);
+        allow update: if canUpdateClientExpense(vehicleId) && validExpenseData(request.resource.data);
       }
 
       match /documents/{documentId} {
@@ -251,39 +332,43 @@ service cloud.firestore {
 
       match /inspections/{inspectionId} {
         allow read: if ownsVehicle(vehicleId);
-        allow create: if canDriverVehicle(vehicleId)
+        allow create: if canDriverVehicle(vehicleId) && validInspectionData(request.resource.data)
           && request.resource.data.vehicleId == vehicleId;
-        allow update, delete: if canEditVehicle(vehicleId);
+        allow update: if canEditVehicle(vehicleId) && validInspectionData(request.resource.data);
+        allow delete: if canEditVehicle(vehicleId);
       }
 
       match /issues/{issueId} {
         allow read: if ownsVehicle(vehicleId);
-        allow create: if canDriverVehicle(vehicleId)
+        allow create: if canDriverVehicle(vehicleId) && validIssueData(request.resource.data)
           && request.resource.data.vehicleId == vehicleId;
-        allow update, delete: if canEditVehicle(vehicleId);
+        allow update: if canEditVehicle(vehicleId) && validIssueData(request.resource.data);
+        allow delete: if canEditVehicle(vehicleId);
       }
 
       match /workOrders/{workOrderId} {
         allow read: if ownsVehicle(vehicleId);
-        allow create, update, delete: if canEditVehicle(vehicleId)
+        allow create, update: if canEditVehicle(vehicleId)
+          && validWorkOrderData(request.resource.data)
           && request.resource.data.vehicleId == vehicleId;
+        allow delete: if canEditVehicle(vehicleId);
       }
     }
 
     match /reminders/{reminderId} {
-      allow create: if (
+      allow create: if ((
           request.resource.data.ownerType == 'organization'
           && canDriverOrg(request.resource.data.ownerId)
           && canDriverVehicle(request.resource.data.vehicleId)
         ) || (
           isOwner(request.resource.data.userId)
           && canDriverVehicle(request.resource.data.vehicleId)
-        );
+        )) && validReminderData(request.resource.data);
       allow read, delete: if (
           resource.data.ownerType == 'organization'
           && canViewOrg(resource.data.ownerId)
         ) || isOwner(resource.data.userId);
-      allow update: if (
+      allow update: if ((
           resource.data.ownerType == 'organization'
           && canDriverOrg(resource.data.ownerId)
           && request.resource.data.ownerId == resource.data.ownerId
@@ -292,7 +377,7 @@ service cloud.firestore {
           isOwner(resource.data.userId)
           && request.resource.data.userId == resource.data.userId
           && request.resource.data.vehicleId == resource.data.vehicleId
-        );
+        )) && validReminderData(request.resource.data);
     }
 
     match /users/{userId} {

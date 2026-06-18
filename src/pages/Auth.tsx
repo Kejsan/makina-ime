@@ -8,7 +8,7 @@ import { PwaInstallButton } from '../components/PwaInstallButton';
 import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../components/DevelopmentNotice';
 import { useAuth } from '../context/AuthContext';
 import { Seo } from '../lib/seo';
-import logo from '../assets/Makina Ime Logo.png';
+import logo from '../assets/Makina Ime Logo.webp';
 
 export const Auth = () => {
     const { t } = useTranslation();
@@ -122,7 +122,7 @@ export const Auth = () => {
             />
             <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
                 <Link to="/" className="flex items-center gap-3">
-                    <img src={logo} alt="Makina Ime" className="h-10 w-auto" />
+                    <img src={logo} alt="Makina Ime" width="658" height="658" className="h-10 w-auto" />
                 </Link>
                 <div className="flex items-center gap-2">
                     <PwaInstallButton compact />

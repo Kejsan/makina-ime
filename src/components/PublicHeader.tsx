@@ -4,7 +4,7 @@ import { Globe2, Menu, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { PwaInstallButton } from './PwaInstallButton';
 import { ThemeToggle } from './ui/design-system';
-import logo from '../assets/Makina Ime Logo.png';
+import logo from '../assets/Makina Ime Logo.webp';
 
 type PublicNavItem = {
     label: string;
@@ -73,10 +73,10 @@ export const PublicHeader = ({
     const closeMenu = () => setMenuOpen(false);
 
     return (
-        <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-xl">
+        <header className="sticky top-0 z-40 border-b border-border/80 bg-background">
             <div className="mx-auto box-border flex w-full max-w-none items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
                 <Link to="/" className="flex min-w-0 items-center gap-3" onClick={closeMenu}>
-                    <img src={logo} alt="Makina Ime" className="h-10 w-auto shrink-0" />
+                    <img src={logo} alt="Makina Ime" width="658" height="658" className="h-10 w-auto shrink-0" />
                     <div className="hidden min-w-0 sm:block">
                         <p className="text-sm font-extrabold">Makina Ime</p>
                         <p className="truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{tagline}</p>

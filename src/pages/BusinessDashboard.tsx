@@ -32,6 +32,7 @@ import {
 import { Layout } from '../components/ui/Layout';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import { AppSurface, EmptyState, MetricCard, PageHeader, Panel, StatusPill } from '../components/ui/design-system';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
@@ -48,6 +49,7 @@ import {
     parseSimpleCsv,
 } from '../lib/business';
 import { expenseAmount, sumExpenses } from '../lib/expenses';
+import { type FieldErrors, type VehicleField, validateVehicleDraft } from '../lib/validation';
 import type {
     BusinessVendor,
     ExpenseRecord,
@@ -106,6 +108,7 @@ export const BusinessDashboard = () => {
         roadTaxExpiry: '',
         tintedGlassCertificateExpiry: '',
     });
+    const [vehicleErrors, setVehicleErrors] = useState<FieldErrors<VehicleField>>({});
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState<OrganizationRole>('manager');
     const [vendorForm, setVendorForm] = useState({
@@ -241,22 +244,38 @@ export const BusinessDashboard = () => {
     const createVehicle = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!orgId || !user || !editable) return;
+        const validation = validateVehicleDraft({
+            make: vehicleForm.make,
+            model: vehicleForm.model,
+            year: vehicleForm.year,
+            plateNumber: vehicleForm.plateNumber,
+            vin: vehicleForm.vin,
+            currentMileage: vehicleForm.currentMileage,
+            engineCapacity: '',
+            estimatedValue: '',
+        });
+        setVehicleErrors(validation.errors);
+        if (!validation.value) {
+            window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-invalid="true"]')?.focus());
+            return;
+        }
+        const values = validation.value;
 
         await addDoc(collection(db, 'vehicles'), {
             userId: user.uid,
             ownerType: 'organization',
             ownerId: orgId,
             organizationId: orgId,
-            make: vehicleForm.make.trim(),
-            model: vehicleForm.model.trim(),
-            year: parseInt(vehicleForm.year),
-            plateNumber: vehicleForm.plateNumber.trim().toUpperCase(),
-            vin: vehicleForm.vin.trim().toUpperCase(),
+            make: values.make,
+            model: values.model,
+            year: values.year,
+            plateNumber: values.plateNumber,
+            vin: values.vin,
             vehicleType: vehicleForm.vehicleType,
             businessStatus: vehicleForm.businessStatus,
             assignedDriverName: vehicleForm.assignedDriverName.trim() || null,
             department: vehicleForm.department.trim() || null,
-            currentMileage: vehicleForm.currentMileage ? parseInt(vehicleForm.currentMileage) : 0,
+            currentMileage: values.currentMileage,
             registrationExpiry: vehicleForm.registrationExpiry ? Timestamp.fromDate(new Date(vehicleForm.registrationExpiry)) : null,
             tplInsuranceExpiry: vehicleForm.tplInsuranceExpiry ? Timestamp.fromDate(new Date(vehicleForm.tplInsuranceExpiry)) : null,
             technicalInspectionExpiry: vehicleForm.technicalInspectionExpiry ? Timestamp.fromDate(new Date(vehicleForm.technicalInspectionExpiry)) : null,
@@ -286,6 +305,7 @@ export const BusinessDashboard = () => {
             tintedGlassCertificateExpiry: '',
         });
         setIsVehicleModalOpen(false);
+        setVehicleErrors({});
     };
 
     const sendInvite = async (event: React.FormEvent) => {
@@ -349,26 +369,40 @@ export const BusinessDashboard = () => {
         }
 
         let imported = 0;
-        for (const row of rows.slice(1)) {
+        const invalidRows: string[] = [];
+        for (const [rowIndex, row] of rows.slice(1).entries()) {
             const record = Object.fromEntries(headers.map((header, index) => [header, row[index] || '']));
-            const year = Number(record.year);
-            if (!record.make || !record.model || !Number.isInteger(year)) continue;
+            const validation = validateVehicleDraft({
+                make: String(record.make || ''),
+                model: String(record.model || ''),
+                year: String(record.year || ''),
+                plateNumber: String(record.plateNumber || ''),
+                vin: String(record.vin || ''),
+                currentMileage: String(record.currentMileage || ''),
+                engineCapacity: '',
+                estimatedValue: '',
+            });
+            if (!validation.value) {
+                invalidRows.push(`row ${rowIndex + 2}: ${Object.values(validation.errors).join(' ')}`);
+                continue;
+            }
+            const values = validation.value;
 
             await addDoc(collection(db, 'vehicles'), {
                 userId: user.uid,
                 ownerType: 'organization',
                 ownerId: orgId,
                 organizationId: orgId,
-                make: record.make,
-                model: record.model,
-                year,
-                plateNumber: String(record.plateNumber || '').toUpperCase(),
-                vin: String(record.vin || '').toUpperCase(),
+                make: values.make,
+                model: values.model,
+                year: values.year,
+                plateNumber: values.plateNumber,
+                vin: values.vin,
                 vehicleType: record.vehicleType || 'car',
                 businessStatus: businessVehicleStatuses.some((status) => status.value === record.businessStatus) ? record.businessStatus : 'active',
                 assignedDriverName: record.assignedDriverName || null,
                 department: record.department || null,
-                currentMileage: record.currentMileage ? Number(record.currentMileage) : 0,
+                currentMileage: values.currentMileage,
                 createdAt: serverTimestamp(),
                 createdBy: user.uid,
                 updatedAt: serverTimestamp(),
@@ -377,7 +411,7 @@ export const BusinessDashboard = () => {
             imported += 1;
         }
 
-        setMessage(`Imported ${imported} vehicle${imported === 1 ? '' : 's'}.`);
+        setMessage(`Imported ${imported} vehicle${imported === 1 ? '' : 's'}.${invalidRows.length ? ` Rejected ${invalidRows.length}: ${invalidRows.slice(0, 5).join(' | ')}` : ''}`);
     };
 
     const exportBusinessJson = async () => {
@@ -587,16 +621,15 @@ export const BusinessDashboard = () => {
             </div>
 
             {isVehicleModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="app-dialog-panel w-full max-w-2xl p-6">
-                        <h2 className="mb-5 text-xl font-bold">Add business vehicle</h2>
+                <Modal onClose={() => setIsVehicleModalOpen(false)} titleId="business-vehicle-title" className="max-w-2xl">
+                        <h2 id="business-vehicle-title" className="mb-5 text-xl font-bold">Add business vehicle</h2>
                         <form onSubmit={createVehicle} className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
-                                <Input label="Make" value={vehicleForm.make} onChange={(event) => setVehicleForm({ ...vehicleForm, make: event.target.value })} required />
-                                <Input label="Model" value={vehicleForm.model} onChange={(event) => setVehicleForm({ ...vehicleForm, model: event.target.value })} required />
-                                <Input label="Year" type="number" value={vehicleForm.year} onChange={(event) => setVehicleForm({ ...vehicleForm, year: event.target.value })} required />
-                                <Input label="Plate number" value={vehicleForm.plateNumber} onChange={(event) => setVehicleForm({ ...vehicleForm, plateNumber: event.target.value })} />
-                                <Input label="VIN" value={vehicleForm.vin} onChange={(event) => setVehicleForm({ ...vehicleForm, vin: event.target.value })} />
+                                <Input label="Make" maxLength={80} value={vehicleForm.make} error={vehicleErrors.make} onChange={(event) => setVehicleForm({ ...vehicleForm, make: event.target.value })} required />
+                                <Input label="Model" maxLength={80} value={vehicleForm.model} error={vehicleErrors.model} onChange={(event) => setVehicleForm({ ...vehicleForm, model: event.target.value })} required />
+                                <Input label="Year" type="text" inputMode="numeric" maxLength={4} value={vehicleForm.year} error={vehicleErrors.year} onChange={(event) => setVehicleForm({ ...vehicleForm, year: event.target.value })} required />
+                                <Input label="Plate number" maxLength={15} autoCapitalize="characters" spellCheck={false} value={vehicleForm.plateNumber} error={vehicleErrors.plateNumber} onChange={(event) => setVehicleForm({ ...vehicleForm, plateNumber: event.target.value })} />
+                                <Input label="VIN" maxLength={17} autoCapitalize="characters" spellCheck={false} value={vehicleForm.vin} error={vehicleErrors.vin} onChange={(event) => setVehicleForm({ ...vehicleForm, vin: event.target.value })} />
                                 <div className="space-y-2">
                                     <label className="mi-label">Business status</label>
                                     <select className="mi-field" value={vehicleForm.businessStatus} onChange={(event) => setVehicleForm({ ...vehicleForm, businessStatus: event.target.value })}>
@@ -605,7 +638,7 @@ export const BusinessDashboard = () => {
                                 </div>
                                 <Input label="Assigned driver" value={vehicleForm.assignedDriverName} onChange={(event) => setVehicleForm({ ...vehicleForm, assignedDriverName: event.target.value })} />
                                 <Input label="Department" value={vehicleForm.department} onChange={(event) => setVehicleForm({ ...vehicleForm, department: event.target.value })} />
-                                <Input label="Current mileage" type="number" value={vehicleForm.currentMileage} onChange={(event) => setVehicleForm({ ...vehicleForm, currentMileage: event.target.value })} />
+                                <Input label="Current mileage" type="text" inputMode="numeric" maxLength={7} value={vehicleForm.currentMileage} error={vehicleErrors.currentMileage} onChange={(event) => setVehicleForm({ ...vehicleForm, currentMileage: event.target.value })} />
                                 <Input label="Registration expiry" type="date" value={vehicleForm.registrationExpiry} onChange={(event) => setVehicleForm({ ...vehicleForm, registrationExpiry: event.target.value })} />
                                 <Input label="TPL insurance expiry" type="date" value={vehicleForm.tplInsuranceExpiry} onChange={(event) => setVehicleForm({ ...vehicleForm, tplInsuranceExpiry: event.target.value })} />
                                 <Input label="Technical inspection expiry" type="date" value={vehicleForm.technicalInspectionExpiry} onChange={(event) => setVehicleForm({ ...vehicleForm, technicalInspectionExpiry: event.target.value })} />
@@ -617,14 +650,12 @@ export const BusinessDashboard = () => {
                                 <Button type="button" variant="outline" className="h-11" onClick={() => setIsVehicleModalOpen(false)}>Cancel</Button>
                             </div>
                         </form>
-                    </AppSurface>
-                </div>
+                </Modal>
             )}
 
             {isInviteOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="app-dialog-panel w-full max-w-md p-6">
-                        <h2 className="mb-5 text-xl font-bold">Invite team member</h2>
+                <Modal onClose={() => setIsInviteOpen(false)} titleId="invite-member-title" className="max-w-md">
+                        <h2 id="invite-member-title" className="mb-5 text-xl font-bold">Invite team member</h2>
                         <form onSubmit={sendInvite} className="space-y-4">
                             <Input label="Email" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} required />
                             <div className="space-y-2">
@@ -638,14 +669,12 @@ export const BusinessDashboard = () => {
                                 <Button type="button" variant="outline" className="h-11" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
                             </div>
                         </form>
-                    </AppSurface>
-                </div>
+                </Modal>
             )}
 
             {isVendorOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="app-dialog-panel w-full max-w-lg p-6">
-                        <h2 className="mb-5 text-xl font-bold">Add vendor</h2>
+                <Modal onClose={() => setIsVendorOpen(false)} titleId="add-vendor-title" className="max-w-lg">
+                        <h2 id="add-vendor-title" className="mb-5 text-xl font-bold">Add vendor</h2>
                         <form onSubmit={createVendor} className="space-y-4">
                             <Input label="Vendor name" value={vendorForm.name} onChange={(event) => setVendorForm({ ...vendorForm, name: event.target.value })} required />
                             <div className="space-y-2">
@@ -668,8 +697,7 @@ export const BusinessDashboard = () => {
                                 <Button type="button" variant="outline" className="h-11" onClick={() => setIsVendorOpen(false)}>Cancel</Button>
                             </div>
                         </form>
-                    </AppSurface>
-                </div>
+                </Modal>
             )}
         </Layout>
     );

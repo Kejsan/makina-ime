@@ -1,6 +1,5 @@
-import { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
 import { LocalizedDom } from './components/LocalizedDom';
 import { PublicDevelopmentWarning } from './components/DevelopmentNotice';
 import { ThemeProvider } from './context/ThemeContext';
@@ -18,6 +17,7 @@ const Landing = lazy(() => import('./pages/Landing').then((module) => ({ default
 const LegalPage = lazy(() => import('./pages/LegalPage').then((module) => ({ default: module.LegalPage })));
 const ProfileSettings = lazy(() => import('./pages/ProfileSettings').then((module) => ({ default: module.ProfileSettings })));
 const VehicleDetails = lazy(() => import('./pages/VehicleDetails').then((module) => ({ default: module.VehicleDetails })));
+const AuthenticatedRoute = lazy(() => import('./components/AuthenticatedRoute').then((module) => ({ default: module.AuthenticatedRoute })));
 
 const LoadingScreen = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
@@ -68,21 +68,9 @@ const ScrollToTop = () => {
   return null;
 };
 
-// Protected Route Component
-const PrivateRoute = ({ children }: { children: ReactNode }) => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingScreen />;
-  }
-
-  return user ? <>{children}</> : <Navigate to="/auth" />;
-};
-
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
         <Router>
           <LocalizedDom />
           <ScrollToTop />
@@ -91,72 +79,71 @@ function App() {
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/business-fleet" element={<BusinessLanding />} />
-              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth" element={<AuthenticatedRoute><Auth /></AuthenticatedRoute>} />
               <Route path="/privacy" element={<LegalPage type="privacy" />} />
               <Route path="/cookies" element={<LegalPage type="cookies" />} />
               <Route path="/terms" element={<LegalPage type="terms" />} />
               <Route
                 path="/app"
                 element={
-                  <PrivateRoute>
+                  <AuthenticatedRoute requireUser>
                     <Dashboard />
-                  </PrivateRoute>
+                  </AuthenticatedRoute>
                 }
               />
               <Route path="/dashboard" element={<Navigate to="/app" replace />} />
               <Route
                 path="/business"
                 element={
-                  <PrivateRoute>
+                  <AuthenticatedRoute requireUser>
                     <BusinessHome />
-                  </PrivateRoute>
+                  </AuthenticatedRoute>
                 }
               />
               <Route
                 path="/business/:orgId"
                 element={
-                  <PrivateRoute>
+                  <AuthenticatedRoute requireUser>
                     <BusinessDashboard />
-                  </PrivateRoute>
+                  </AuthenticatedRoute>
                 }
               />
               <Route
                 path="/business/:orgId/vehicle/:id"
                 element={
-                  <PrivateRoute>
+                  <AuthenticatedRoute requireUser>
                     <BusinessVehicleDetails />
-                  </PrivateRoute>
+                  </AuthenticatedRoute>
                 }
               />
               <Route
                 path="/calendar"
                 element={
-                  <PrivateRoute>
+                  <AuthenticatedRoute requireUser>
                     <CalendarPage />
-                  </PrivateRoute>
+                  </AuthenticatedRoute>
                 }
               />
               <Route
                 path="/profile"
                 element={
-                  <PrivateRoute>
+                  <AuthenticatedRoute requireUser>
                     <ProfileSettings />
-                  </PrivateRoute>
+                  </AuthenticatedRoute>
                 }
               />
               <Route
                 path="/vehicle/:id"
                 element={
-                  <PrivateRoute>
+                  <AuthenticatedRoute requireUser>
                     <VehicleDetails />
-                  </PrivateRoute>
+                  </AuthenticatedRoute>
                 }
               />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </Router>
-      </AuthProvider>
     </ThemeProvider>
   );
 }

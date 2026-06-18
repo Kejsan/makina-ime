@@ -7,7 +7,8 @@ import { Input } from './ui/Input';
 import { Card } from './ui/Card';
 import { DollarSign, Calendar, Trash2, Plus, Tag, Pencil } from 'lucide-react';
 import type { ExpenseRecord } from '../lib/types';
-import { expenseAmount, moneyValue, sumExpenses } from '../lib/expenses';
+import { expenseAmount, sumExpenses } from '../lib/expenses';
+import { isValidDateInput, parseMoney } from '../lib/validation';
 
 export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: string; quickAddToken?: number }) => {
     const { user } = useAuth();
@@ -23,6 +24,8 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
     const [amount, setAmount] = useState('');
     const [date, setDate] = useState('');
     const [notes, setNotes] = useState('');
+    const [amountError, setAmountError] = useState('');
+    const [dateError, setDateError] = useState('');
 
     const categories = ['Fuel', 'Insurance', 'Tax', 'Parking', 'Tolls', 'Cleaning', 'Maintenance', 'Document', 'Other'];
 
@@ -41,6 +44,8 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
         setDate('');
         setNotes('');
         setFormError('');
+        setAmountError('');
+        setDateError('');
     };
 
     const openCreateForm = () => {
@@ -100,9 +105,15 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
         e.preventDefault();
         if (!user) return;
 
+        const parsedAmountResult = parseMoney(amount, { required: true, min: 0.01 });
+        const nextDateError = isValidDateInput(date) ? '' : 'Enter a valid date.';
+        setAmountError(parsedAmountResult.error || '');
+        setDateError(nextDateError);
+        if (parsedAmountResult.error || nextDateError || parsedAmountResult.value === null) return;
+
         try {
             setFormError('');
-            const parsedAmount = moneyValue(amount);
+            const parsedAmount = parsedAmountResult.value;
             const payload = {
                 category,
                 amount: parsedAmount,
@@ -204,7 +215,7 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
             )}
 
             {showForm && (
-                <Card className="p-6 border-primary/20 animate-in fade-in slide-in-from-top-2 bg-surface/50 backdrop-blur-sm">
+                <Card className="p-6 border-primary/20 animate-in fade-in slide-in-from-top-2">
                     <form onSubmit={handleSaveExpense} className="space-y-4">
                         <h4 className="font-bold">{editingExpense ? 'Edit Expense' : 'Add Expense'}</h4>
                         {formError && (
@@ -224,10 +235,13 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                                 </select>
                             </div>
                             <Input 
-                                type="number" 
+                                type="text"
+                                inputMode="decimal"
+                                maxLength={13}
                                 label="Amount (€)" 
                                 placeholder="0.00" 
                                 value={amount} 
+                                error={amountError}
                                 onChange={e => setAmount(e.target.value)} 
                                 required 
                             />
@@ -237,6 +251,7 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                                 type="date" 
                                 label="Date" 
                                 value={date} 
+                                error={dateError}
                                 onChange={e => setDate(e.target.value)} 
                                 required 
                             />
@@ -244,6 +259,7 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                                 label="Notes (Optional)" 
                                 placeholder="Details..." 
                                 value={notes} 
+                                maxLength={500}
                                 onChange={e => setNotes(e.target.value)} 
                             />
                         </div>
@@ -266,7 +282,7 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                     </div>
                 ) : (
                     expenses.map(expense => (
-                        <Card key={expense.id} className="p-4 hover:border-primary/30 transition-all duration-300 group">
+                        <Card key={expense.id} className="group p-4 transition-colors duration-300 hover:border-primary/30">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex min-w-0 items-center gap-4">
                                     <div className="p-2.5 bg-surface rounded-xl border border-border">

@@ -90,14 +90,26 @@ export const LocalizedDom = () => {
         window.alert = (message?: unknown) => alertOriginal.call(window, typeof message === 'string' ? translateValue(message) : message);
         window.confirm = (message?: string) => confirmOriginal.call(window, typeof message === 'string' ? translateValue(message) : message);
 
+        const pendingNodes = new Set<Node>();
+        let frameId = 0;
+        const flushPendingNodes = () => {
+            frameId = 0;
+            pendingNodes.forEach(translateTree);
+            pendingNodes.clear();
+        };
+        const scheduleNode = (node: Node) => {
+            pendingNodes.add(node);
+            if (!frameId) frameId = window.requestAnimationFrame(flushPendingNodes);
+        };
+
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.type === 'characterData') {
-                    translateTree(mutation.target);
+                    scheduleNode(mutation.target);
                 }
-                mutation.addedNodes.forEach(translateTree);
+                mutation.addedNodes.forEach(scheduleNode);
                 if (mutation.type === 'attributes') {
-                    translateTree(mutation.target);
+                    translateElement(mutation.target as Element);
                 }
             });
         });
@@ -116,6 +128,8 @@ export const LocalizedDom = () => {
 
         return () => {
             observer.disconnect();
+            if (frameId) window.cancelAnimationFrame(frameId);
+            pendingNodes.clear();
             i18n.off('languageChanged', run);
             window.alert = alertOriginal;
             window.confirm = confirmOriginal;

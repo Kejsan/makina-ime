@@ -26,7 +26,7 @@ import {
     webPageSchema,
     websiteSchema,
 } from '../lib/seo';
-import logo from '../assets/Makina Ime Logo.png';
+import logo from '../assets/Makina Ime Logo.webp';
 
 const businessTitle = 'Makina Ime Business Fleet | Free fleet records, compliance, and expense tracking';
 const businessDescription = 'Makina Ime Business Fleet is a free fleet management workspace for businesses. Track vehicles, documents, reminders, inspections, work orders, team roles, and expenses.';
@@ -116,7 +116,7 @@ export const BusinessLanding = () => {
 
             <main>
                 <section className="relative min-h-[86vh] overflow-hidden border-b border-border/80">
-                    <img src={logo} alt="" className="pointer-events-none absolute right-[-5rem] top-10 w-[28rem] max-w-none opacity-10 sm:right-2 sm:w-[34rem]" />
+                    <img src={logo} alt="" width="658" height="658" decoding="async" className="pointer-events-none absolute right-[-5rem] top-10 w-[28rem] max-w-none opacity-10 sm:right-2 sm:w-[34rem]" />
                     <div className="absolute inset-x-0 bottom-0 hidden h-40 border-t border-border/50 bg-card/25 md:block" />
                     <div className="relative mx-auto flex min-h-[86vh] max-w-7xl flex-col justify-center px-4 py-12 sm:px-6 lg:px-10">
                         <div className="max-w-3xl space-y-6">

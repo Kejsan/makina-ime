@@ -2,8 +2,8 @@ import type React from 'react';
 import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BarChart3, CheckCircle2, Mail, ShieldAlert, X } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import { AppSurface, Panel } from './ui/design-system';
+import { Modal } from './ui/Modal';
 
 export const developmentNoticeText = 'Makina Ime is still under active development. Data protection, data retention, backups, security controls, and uninterrupted access are not guaranteed yet. Please do not store sensitive, urgent, or irreplaceable information here. The project is shared as a work-in-progress for early testing, and you use it at your own discretion.';
 
@@ -61,8 +61,7 @@ export const PublicDevelopmentWarning = () => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/72 p-4 backdrop-blur-sm sm:items-center">
-            <AppSurface className="w-full max-w-lg p-5 shadow-xl">
+        <Modal onClose={dismiss} titleId="development-warning-title" className="max-w-lg p-5">
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex gap-3">
                         <div className="rounded-xl bg-amber-500/10 p-2 text-amber-400">
@@ -70,7 +69,7 @@ export const PublicDevelopmentWarning = () => {
                         </div>
                         <div>
                             <p className="mi-label text-amber-300">Before you continue</p>
-                            <h2 className="mt-1 text-xl font-bold tracking-tight">Makina Ime is a work-in-progress project</h2>
+                            <h2 id="development-warning-title" className="mt-1 text-xl font-bold tracking-tight">Makina Ime is a work-in-progress project</h2>
                         </div>
                     </div>
                     <button
@@ -105,15 +104,13 @@ export const PublicDevelopmentWarning = () => {
                         Read terms
                     </Link>
                 </div>
-            </AppSurface>
-        </div>
+        </Modal>
     );
 };
 
 export const PaidPlanInterestForm = ({ className = '', compact = false }: { className?: string; compact?: boolean }) => {
-    const { user } = useAuth();
     const [name, setName] = useState('');
-    const [email, setEmail] = useState(user?.email || '');
+    const [email, setEmail] = useState('');
     const [accountType, setAccountType] = useState('business');
     const [message, setMessage] = useState('');
     const [accepted, setAccepted] = useState(false);

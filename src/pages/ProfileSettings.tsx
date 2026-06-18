@@ -255,11 +255,17 @@ export const ProfileSettings = () => {
                             </div>
                             <Input
                                 label="Default reminder lead time"
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={3}
                                 min="0"
                                 max="365"
                                 value={preferences.defaultReminderLeadTimeDays}
-                                onChange={(event) => updatePreference('defaultReminderLeadTimeDays', parseInt(event.target.value || '0'))}
+                                onChange={(event) => {
+                                    if (/^\d{0,3}$/.test(event.target.value)) {
+                                        updatePreference('defaultReminderLeadTimeDays', Math.min(365, Number(event.target.value || 0)));
+                                    }
+                                }}
                             />
                         </div>
                         <div className="mt-4 grid gap-3 md:grid-cols-2">

@@ -7,6 +7,7 @@ import { db } from '../lib/firebase';
 import { Layout } from '../components/ui/Layout';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import { AppSurface, PageHeader, Panel, StatusPill } from '../components/ui/design-system';
 import { ServiceLog } from '../components/ServiceLog';
 import { ExpenseTracker } from '../components/ExpenseTracker';
@@ -14,6 +15,7 @@ import { DocumentManager } from '../components/DocumentManager';
 import { ReminderManager } from '../components/ReminderManager';
 import { MaintenanceInsights } from '../components/MaintenanceInsights';
 import type { Vehicle } from '../lib/types';
+import { type FieldErrors, type VehicleField, validateVehicleDraft, vehicleRecordErrors } from '../lib/validation';
 
 type VehicleTab = 'overview' | 'services' | 'expenses' | 'documents' | 'reminders';
 
@@ -35,6 +37,7 @@ export const VehicleDetails = () => {
     const [message, setMessage] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [editErrors, setEditErrors] = useState<FieldErrors<VehicleField>>({});
     const [editForm, setEditForm] = useState({
         make: '',
         model: '',
@@ -100,6 +103,7 @@ export const VehicleDetails = () => {
             roadTaxExpiry: formatDateInput(vehicle.roadTaxExpiry),
             tintedGlassCertificateExpiry: formatDateInput(vehicle.tintedGlassCertificateExpiry),
         });
+        setEditErrors(vehicleRecordErrors(vehicle));
         setIsEditing(true);
     };
 
@@ -108,20 +112,27 @@ export const VehicleDetails = () => {
     const saveVehicleProfile = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!id) return;
+        const validation = validateVehicleDraft(editForm);
+        setEditErrors(validation.errors);
+        if (!validation.value) {
+            window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[aria-invalid="true"]')?.focus());
+            return;
+        }
+        const values = validation.value;
         setSaving(true);
 
         try {
             await updateDoc(doc(db, 'vehicles', id), {
-                make: editForm.make.trim(),
-                model: editForm.model.trim(),
-                year: parseInt(editForm.year),
-                plateNumber: editForm.plateNumber.trim().toUpperCase(),
-                vin: editForm.vin.trim().toUpperCase(),
+                make: values.make,
+                model: values.model,
+                year: values.year,
+                plateNumber: values.plateNumber,
+                vin: values.vin,
                 vehicleType: editForm.vehicleType,
-                currentMileage: editForm.currentMileage ? parseInt(editForm.currentMileage) : 0,
+                currentMileage: values.currentMileage,
                 registrationExpiry: dateOrNull(editForm.registrationExpiry),
-                engineCapacity: editForm.engineCapacity ? parseInt(editForm.engineCapacity) : null,
-                estimatedValue: editForm.estimatedValue ? parseFloat(editForm.estimatedValue) : null,
+                engineCapacity: values.engineCapacity,
+                estimatedValue: values.estimatedValue,
                 isLuxury: editForm.isLuxury,
                 technicalInspectionExpiry: dateOrNull(editForm.technicalInspectionExpiry),
                 tplInsuranceExpiry: dateOrNull(editForm.tplInsuranceExpiry),
@@ -129,6 +140,7 @@ export const VehicleDetails = () => {
                 tintedGlassCertificateExpiry: dateOrNull(editForm.tintedGlassCertificateExpiry),
             });
             setIsEditing(false);
+            setEditErrors({});
         } finally {
             setSaving(false);
         }
@@ -145,6 +157,8 @@ export const VehicleDetails = () => {
     }
 
     if (!vehicle) return null;
+    const legacyErrors = vehicleRecordErrors(vehicle);
+    const needsCorrection = Object.keys(legacyErrors).length > 0;
 
     return (
         <Layout>
@@ -177,15 +191,21 @@ export const VehicleDetails = () => {
                 />
 
                 {message && <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">{message}</div>}
+                {needsCorrection && (
+                    <button type="button" onClick={openEditModal} className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-left text-sm text-amber-200">
+                        <strong className="block">This vehicle profile needs correction.</strong>
+                        <span className="mt-1 block text-amber-100/80">Review the highlighted fields before making further updates.</span>
+                    </button>
+                )}
 
-                <div className="sticky top-16 z-20 -mx-4 border-y border-border/80 bg-background/95 px-4 py-3 backdrop-blur-xl md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
+                <div className="sticky top-16 z-20 -mx-4 border-y border-border/80 bg-background px-4 py-3 md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
                     <div className="flex gap-2 overflow-x-auto">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 type="button"
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+                                className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                                     activeTab === tab.id
                                         ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
                                         : 'border border-border bg-card/60 text-muted-foreground hover:text-foreground'
@@ -236,11 +256,10 @@ export const VehicleDetails = () => {
                 {activeTab === 'reminders' && <ReminderManager quickAddToken={quickAddToken} />}
 
                 {isEditing && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                        <AppSurface className="app-dialog-panel w-full max-w-2xl p-6 shadow-2xl">
+                    <Modal onClose={() => setIsEditing(false)} titleId="edit-vehicle-title" className="max-w-2xl">
                             <div className="mb-6 flex items-start justify-between gap-4">
                                 <div>
-                                    <h2 className="flex items-center gap-2 text-xl font-bold">
+                                    <h2 id="edit-vehicle-title" className="flex items-center gap-2 text-xl font-bold">
                                         <Pencil className="h-5 w-5 text-primary" />
                                         Edit vehicle profile
                                     </h2>
@@ -253,11 +272,11 @@ export const VehicleDetails = () => {
 
                             <form onSubmit={saveVehicleProfile} className="space-y-5">
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <Input label="Make" value={editForm.make} onChange={(event) => setEditForm({ ...editForm, make: event.target.value })} required />
-                                    <Input label="Model" value={editForm.model} onChange={(event) => setEditForm({ ...editForm, model: event.target.value })} required />
-                                    <Input label="Year" type="number" value={editForm.year} onChange={(event) => setEditForm({ ...editForm, year: event.target.value })} required />
-                                    <Input label="Plate number" value={editForm.plateNumber} onChange={(event) => setEditForm({ ...editForm, plateNumber: event.target.value })} />
-                                    <Input label="VIN" value={editForm.vin} onChange={(event) => setEditForm({ ...editForm, vin: event.target.value })} />
+                                    <Input label="Make" value={editForm.make} maxLength={80} error={editErrors.make} onChange={(event) => setEditForm({ ...editForm, make: event.target.value })} required />
+                                    <Input label="Model" value={editForm.model} maxLength={80} error={editErrors.model} onChange={(event) => setEditForm({ ...editForm, model: event.target.value })} required />
+                                    <Input label="Year" type="text" inputMode="numeric" maxLength={4} value={editForm.year} error={editErrors.year} onChange={(event) => setEditForm({ ...editForm, year: event.target.value })} required />
+                                    <Input label="Plate number" maxLength={15} autoCapitalize="characters" spellCheck={false} value={editForm.plateNumber} error={editErrors.plateNumber} onChange={(event) => setEditForm({ ...editForm, plateNumber: event.target.value })} />
+                                    <Input label="VIN" maxLength={17} autoCapitalize="characters" spellCheck={false} value={editForm.vin} error={editErrors.vin} onChange={(event) => setEditForm({ ...editForm, vin: event.target.value })} />
                                     <div className="space-y-2">
                                         <label className="mi-label">Vehicle type</label>
                                         <select className="mi-field" value={editForm.vehicleType} onChange={(event) => setEditForm({ ...editForm, vehicleType: event.target.value })}>
@@ -268,9 +287,9 @@ export const VehicleDetails = () => {
                                             <option value="van">Van</option>
                                         </select>
                                     </div>
-                                    <Input label="Current mileage" type="number" value={editForm.currentMileage} onChange={(event) => setEditForm({ ...editForm, currentMileage: event.target.value })} />
-                                    <Input label="Engine capacity (cc)" type="number" value={editForm.engineCapacity} onChange={(event) => setEditForm({ ...editForm, engineCapacity: event.target.value })} />
-                                    <Input label="Estimated value (€)" type="number" step="0.01" value={editForm.estimatedValue} onChange={(event) => setEditForm({ ...editForm, estimatedValue: event.target.value })} />
+                                    <Input label="Current mileage" type="text" inputMode="numeric" maxLength={7} value={editForm.currentMileage} error={editErrors.currentMileage} onChange={(event) => setEditForm({ ...editForm, currentMileage: event.target.value })} />
+                                    <Input label="Engine capacity (cc)" type="text" inputMode="numeric" maxLength={6} value={editForm.engineCapacity} error={editErrors.engineCapacity} onChange={(event) => setEditForm({ ...editForm, engineCapacity: event.target.value })} />
+                                    <Input label="Estimated value (€)" type="text" inputMode="decimal" maxLength={13} value={editForm.estimatedValue} error={editErrors.estimatedValue} onChange={(event) => setEditForm({ ...editForm, estimatedValue: event.target.value })} />
                                     <Input label="Registration expiry" type="date" value={editForm.registrationExpiry} onChange={(event) => setEditForm({ ...editForm, registrationExpiry: event.target.value })} />
                                     <Input label="TPL insurance expiry" type="date" value={editForm.tplInsuranceExpiry} onChange={(event) => setEditForm({ ...editForm, tplInsuranceExpiry: event.target.value })} />
                                     <Input label="Technical inspection expiry" type="date" value={editForm.technicalInspectionExpiry} onChange={(event) => setEditForm({ ...editForm, technicalInspectionExpiry: event.target.value })} />
@@ -289,8 +308,7 @@ export const VehicleDetails = () => {
                                     <Button type="button" variant="outline" className="h-11" onClick={() => setIsEditing(false)}>Cancel</Button>
                                 </div>
                             </form>
-                        </AppSurface>
-                    </div>
+                    </Modal>
                 )}
             </div>
         </Layout>

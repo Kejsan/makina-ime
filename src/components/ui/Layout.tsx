@@ -19,7 +19,7 @@ import { NotificationCenter } from '../NotificationCenter';
 import { PwaInstallButton } from '../PwaInstallButton';
 import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../DevelopmentNotice';
 import { ThemeToggle } from './design-system';
-import logo from '../../assets/Makina Ime Logo.png';
+import logo from '../../assets/Makina Ime Logo.webp';
 
 interface SidebarItemProps {
     icon: React.ElementType;
@@ -32,7 +32,7 @@ const SidebarItem = ({ icon: Icon, label, href, isActive }: SidebarItemProps) =>
     <Link
         to={href}
         className={cn(
-            'flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-all',
+            'flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-colors',
             isActive
                 ? 'border border-primary/20 bg-primary/10 font-bold text-primary shadow-sm'
                 : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
@@ -116,10 +116,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <div className="flex min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
-                <aside className="hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-border/80 bg-card/70 p-5 backdrop-blur-xl md:sticky md:top-0 md:flex">
+                <aside className="hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-border/80 bg-card p-5 md:sticky md:top-0 md:flex">
                     <div>
                         <Link to="/app" className="mb-8 flex items-center gap-3">
-                            <img src={logo} alt="Makina Ime" className="h-10 w-auto object-contain" />
+                            <img src={logo} alt="Makina Ime" width="658" height="658" className="h-10 w-auto object-contain" />
                             <div>
                                 <p className="text-sm font-extrabold tracking-tight">Makina Ime</p>
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">App Dashboard</p>
@@ -176,9 +176,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 </aside>
 
                 <main className="min-w-0 flex-1">
-                    <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-border/80 bg-background/90 px-4 pt-safe backdrop-blur-xl md:hidden">
+                    <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-border/80 bg-background px-4 pt-safe md:hidden">
                         <Link to="/app" className="flex items-center gap-2.5">
-                            <img src={logo} alt="Makina Ime" className="h-8 w-auto object-contain" />
+                            <img src={logo} alt="Makina Ime" width="658" height="658" className="h-8 w-auto object-contain" />
                         </Link>
                         <div className="flex items-center gap-2">
                             <Link
@@ -217,7 +217,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 </main>
             </div>
 
-            <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 items-end border-t border-border/80 bg-card/95 px-2 py-2 pb-safe backdrop-blur-xl md:hidden">
+            <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 items-end border-t border-border/80 bg-card px-2 py-2 pb-safe md:hidden">
                 <MobileNavItem icon={LayoutDashboard} label={t('Paneli')} href="/app" isActive={location.pathname === '/app'} />
                 <MobileNavItem icon={Car} label={t('Garazhi')} href="/app#garage-section" isActive={location.hash === '#garage-section' || location.pathname.startsWith('/vehicle') || /\/business\/[^/]+\/vehicle\//.test(location.pathname)} />
                 <button

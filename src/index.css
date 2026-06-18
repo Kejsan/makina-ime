@@ -154,7 +154,7 @@
     @apply bg-background text-foreground;
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     letter-spacing: 0;
-    overflow-x: hidden;
+    max-width: 100%;
   }
 
   button,
@@ -167,7 +167,7 @@
 
 @layer utilities {
   .mi-surface {
-    @apply rounded-2xl border border-border/80 bg-card/80 shadow-sm backdrop-blur-md;
+    @apply rounded-2xl border border-border/80 bg-card shadow-sm;
   }
 
   .mi-panel {
@@ -190,9 +190,10 @@
     padding-top: env(safe-area-inset-top);
   }
 
-  .app-dialog-panel {
-    max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    overflow-y: auto;
+  .mi-modal-scroll {
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
   }
 
   .install-offer-panel {
@@ -219,5 +220,22 @@
 
   .seo-fallback a {
     @apply rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent;
+  }
+}
+
+html,
+#root {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -4,6 +4,7 @@ import { Download, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './ui/Button';
 import { AppSurface } from './ui/design-system';
+import { Modal } from './ui/Modal';
 
 interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;
@@ -112,11 +113,10 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
             )}
 
             {showInstructions && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="app-dialog-panel w-full max-w-sm p-5 shadow-2xl">
+                <Modal onClose={() => setShowInstructions(false)} titleId="install-instructions-title" className="max-w-sm p-5">
                         <div className="mb-4 flex items-start justify-between gap-4">
                             <div>
-                                <h2 className="text-lg font-bold">{t('Install Makina Ime')}</h2>
+                                <h2 id="install-instructions-title" className="text-lg font-bold">{t('Install Makina Ime')}</h2>
                                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
                                     {isIos
                                         ? t('Use your browser menu and choose Add to Home Screen.')
@@ -128,8 +128,7 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
                             </button>
                         </div>
                         <Button className="w-full" onClick={() => setShowInstructions(false)}>{t('Close')}</Button>
-                    </AppSurface>
-                </div>
+                </Modal>
             )}
         </>
     );

@@ -6,11 +6,13 @@ import { Bell, CalendarDays, Filter, Plus, Wrench, X } from 'lucide-react';
 import { Layout } from '../components/ui/Layout';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import { AppSurface, EmptyState, PageHeader, Panel, StatusPill } from '../components/ui/design-system';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import type { Reminder, Vehicle } from '../lib/types';
 import { getVehicleComplianceDeadlines } from '../lib/business';
+import { isValidDateInput, parseInteger } from '../lib/validation';
 
 const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -37,6 +39,7 @@ export const CalendarPage = () => {
     const [isCustomOpen, setIsCustomOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [loadError, setLoadError] = useState('');
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [customReminder, setCustomReminder] = useState({
         vehicleId: '',
         title: '',
@@ -128,6 +131,14 @@ export const CalendarPage = () => {
     const saveCustomReminder = async (event: FormEvent) => {
         event.preventDefault();
         if (!user || !customReminder.vehicleId) return;
+        const leadTime = parseInteger(customReminder.leadTimeDays || '14', { min: 0, max: 365, required: true });
+        const nextErrors: Record<string, string> = {};
+        if (!customReminder.title.trim()) nextErrors.title = t('Title is required.');
+        else if (customReminder.title.trim().length > 120) nextErrors.title = t('Title must be 120 characters or fewer.');
+        if (!isValidDateInput(customReminder.dueDate)) nextErrors.dueDate = t('Enter a valid due date.');
+        if (leadTime.error) nextErrors.leadTimeDays = t(leadTime.error);
+        setFormErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0 || leadTime.value === null) return;
         setSaving(true);
 
         try {
@@ -139,12 +150,13 @@ export const CalendarPage = () => {
                 title: customReminder.title.trim(),
                 type: customReminder.type,
                 dueDate: Timestamp.fromDate(new Date(customReminder.dueDate)),
-                leadTimeDays: parseInt(customReminder.leadTimeDays || '14'),
+                leadTimeDays: leadTime.value,
                 recurrence: customReminder.recurrence,
                 completed: false,
                 createdAt: serverTimestamp(),
             });
             setIsCustomOpen(false);
+            setFormErrors({});
             setCustomReminder({
                 vehicleId: '',
                 title: '',
@@ -280,12 +292,11 @@ export const CalendarPage = () => {
             </div>
 
             {isCustomOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-                    <AppSurface className="app-dialog-panel w-full max-w-lg p-6 shadow-2xl">
+                <Modal onClose={() => setIsCustomOpen(false)} titleId="custom-reminder-title" className="max-w-lg">
                         <div className="mb-5 flex items-start justify-between gap-4">
                             <div>
                                 <p className="mi-label text-primary">{t('Reminders')}</p>
-                                <h2 className="mt-1 text-xl font-bold">{t('Add Custom Reminder')}</h2>
+                                <h2 id="custom-reminder-title" className="mt-1 text-xl font-bold">{t('Add Custom Reminder')}</h2>
                                 <p className="mt-1 text-sm text-muted-foreground">{t('Create a reminder for service, document, or any other vehicle task.')}</p>
                             </div>
                             <button type="button" onClick={() => setIsCustomOpen(false)} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground">
@@ -303,7 +314,7 @@ export const CalendarPage = () => {
                                     ))}
                                 </select>
                             </div>
-                            <Input label={t('Title')} required value={customReminder.title} onChange={(event) => setCustomReminder({ ...customReminder, title: event.target.value })} placeholder={t('e.g. Renew parking permit')} />
+                            <Input label={t('Title')} required maxLength={120} error={formErrors.title} value={customReminder.title} onChange={(event) => setCustomReminder({ ...customReminder, title: event.target.value })} placeholder={t('e.g. Renew parking permit')} />
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
                                     <label className="mi-label">{t('Type')}</label>
@@ -316,8 +327,8 @@ export const CalendarPage = () => {
                                         <option value="other">{t('Other')}</option>
                                     </select>
                                 </div>
-                                <Input label={t('Due Date')} type="date" required value={customReminder.dueDate} onChange={(event) => setCustomReminder({ ...customReminder, dueDate: event.target.value })} />
-                                <Input label={t('Lead time days')} type="number" min="0" max="365" value={customReminder.leadTimeDays} onChange={(event) => setCustomReminder({ ...customReminder, leadTimeDays: event.target.value })} />
+                                <Input label={t('Due Date')} type="date" required error={formErrors.dueDate} value={customReminder.dueDate} onChange={(event) => setCustomReminder({ ...customReminder, dueDate: event.target.value })} />
+                                <Input label={t('Lead time days')} type="text" inputMode="numeric" maxLength={3} min="0" max="365" error={formErrors.leadTimeDays} value={customReminder.leadTimeDays} onChange={(event) => setCustomReminder({ ...customReminder, leadTimeDays: event.target.value })} />
                                 <div className="space-y-2">
                                     <label className="mi-label">{t('Recurrence')}</label>
                                     <select className="mi-field" value={customReminder.recurrence} onChange={(event) => setCustomReminder({ ...customReminder, recurrence: event.target.value as Reminder['recurrence'] })}>
@@ -333,8 +344,7 @@ export const CalendarPage = () => {
                                 <Button type="button" variant="outline" className="h-11" onClick={() => setIsCustomOpen(false)}>{t('Cancel')}</Button>
                             </div>
                         </form>
-                    </AppSurface>
-                </div>
+                </Modal>
             )}
         </Layout>
     );

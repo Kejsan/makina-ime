@@ -8,6 +8,7 @@ import { Card } from './ui/Card';
 import { Wrench, Calendar, Trash2, Plus, Gauge, Pencil } from 'lucide-react';
 import type { ServiceRecord } from '../lib/types';
 import { moneyValue } from '../lib/expenses';
+import { isValidDateInput, parseInteger, parseMoney, VEHICLE_LIMITS } from '../lib/validation';
 
 export const ServiceLog = ({
     vehicleId,
@@ -31,6 +32,7 @@ export const ServiceLog = ({
     const [date, setDate] = useState('');
     const [cost, setCost] = useState('');
     const [mileage, setMileage] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     const resetForm = () => {
         setEditingService(null);
@@ -39,6 +41,7 @@ export const ServiceLog = ({
         setCost('');
         setMileage('');
         setFormError('');
+        setFieldErrors({});
     };
 
     const formatDateInput = (serviceDate?: Timestamp) => {
@@ -97,6 +100,16 @@ export const ServiceLog = ({
     const handleSaveService = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
+        const costResult = parseMoney(cost, { required: true });
+        const mileageResult = parseInteger(mileage, { max: VEHICLE_LIMITS.maxMileage, required: true });
+        const nextErrors: Record<string, string> = {};
+        if (!description.trim()) nextErrors.description = 'Description is required.';
+        else if (description.trim().length > 200) nextErrors.description = 'Description must be 200 characters or fewer.';
+        if (!isValidDateInput(date)) nextErrors.date = 'Enter a valid date.';
+        if (costResult.error) nextErrors.cost = costResult.error;
+        if (mileageResult.error) nextErrors.mileage = mileageResult.error;
+        setFieldErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0 || costResult.value === null || mileageResult.value === null) return;
         try {
             setFormError('');
             const serviceRef = editingService
@@ -107,8 +120,8 @@ export const ServiceLog = ({
                 ? doc(collection(db, 'vehicles', vehicleId, 'expenses'))
                 : doc(db, 'vehicles', vehicleId, 'expenses', editingService.expenseId!);
             const serviceDate = Timestamp.fromDate(new Date(date));
-            const serviceCost = moneyValue(cost);
-            const serviceMileage = parseInt(mileage || '0', 10) || 0;
+            const serviceCost = costResult.value;
+            const serviceMileage = mileageResult.value;
             const batch = writeBatch(db);
             const servicePayload = {
                 userId: editingService?.userId || user.uid,
@@ -203,7 +216,7 @@ export const ServiceLog = ({
             )}
 
             {showForm && (
-                <Card className="p-6 border-primary/20 animate-in fade-in slide-in-from-top-2 bg-surface/50 backdrop-blur-sm">
+                <Card className="p-6 border-primary/20 animate-in fade-in slide-in-from-top-2">
                     <form onSubmit={handleSaveService} className="space-y-4">
                         <h4 className="font-bold">{editingService ? 'Edit Service' : 'Add Service'}</h4>
                         {formError && (
@@ -215,6 +228,8 @@ export const ServiceLog = ({
                             label="Description" 
                             placeholder="Oil Change, Brake Pads..." 
                             value={description} 
+                            maxLength={200}
+                            error={fieldErrors.description}
                             onChange={e => setDescription(e.target.value)} 
                             required 
                         />
@@ -223,22 +238,29 @@ export const ServiceLog = ({
                                 type="date" 
                                 label="Date" 
                                 value={date} 
+                                error={fieldErrors.date}
                                 onChange={e => setDate(e.target.value)} 
                                 required 
                             />
                             <Input 
-                                type="number" 
+                                type="text"
+                                inputMode="decimal"
+                                maxLength={13}
                                 label="Cost (€)" 
                                 placeholder="0.00" 
                                 value={cost} 
+                                error={fieldErrors.cost}
                                 onChange={e => setCost(e.target.value)} 
                                 required 
                             />
                             <Input 
-                                type="number" 
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={7}
                                 label="Mileage (km)" 
                                 placeholder="120000" 
                                 value={mileage} 
+                                error={fieldErrors.mileage}
                                 onChange={e => setMileage(e.target.value)} 
                                 required 
                             />
@@ -262,7 +284,7 @@ export const ServiceLog = ({
                     </div>
                 ) : (
                     services.map(service => (
-                        <Card key={service.id} className="p-5 hover:border-primary/30 transition-all duration-300 group">
+                        <Card key={service.id} className="group p-5 transition-colors duration-300 hover:border-primary/30">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex min-w-0 items-start gap-4">
                                     <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">

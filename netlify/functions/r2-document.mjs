@@ -8,6 +8,8 @@ const ALLOWED_DOCUMENT_TYPES = new Set(['insurance', 'registration', 'inspection
 const DEFAULT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 300;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,160}$/;
+const PLATE = /^[A-Z0-9](?:[A-Z0-9 -]{0,13}[A-Z0-9])?$/;
+const VIN = /^[A-HJ-NPR-Z0-9]{17}$/;
 const ROLE_RANK = { viewer: 0, driver: 1, manager: 2, admin: 3, owner: 4 };
 const RATE_LIMITS = {
   createUploadUrl: { user: 20, ip: 60 },
@@ -135,6 +137,19 @@ const optionalSafeMetadataString = (body, field, maxLength = 80) => {
   const value = optionalString(body, field, maxLength);
   if (!value) return null;
   if (!/^[\w\s./:-]+$/i.test(value)) {
+    throw Object.assign(new Error(`Invalid ${field}`), { statusCode: 400 });
+  }
+  return value;
+};
+
+const optionalDateInput = (body, field) => {
+  const value = optionalString(body, field, 10);
+  if (!value) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw Object.assign(new Error(`Invalid ${field}`), { statusCode: 400 });
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
     throw Object.assign(new Error(`Invalid ${field}`), { statusCode: 400 });
   }
   return value;
@@ -376,10 +391,10 @@ const finalizeUpload = async (uid, body) => {
   const cost = body.cost === undefined || body.cost === null || body.cost === '' ? 0 : Number(body.cost);
   const type = requireDocumentType(body);
   const name = sanitizeFileName(requireSafeString(body, 'name', 180));
-  const issueDate = optionalString(body, 'issueDate', 40);
-  const expiryDate = optionalString(body, 'expiryDate', 40);
-  const plateNumber = optionalSafeMetadataString(body, 'plateNumber', 30);
-  const vin = optionalSafeMetadataString(body, 'vin', 30);
+  const issueDate = optionalDateInput(body, 'issueDate');
+  const expiryDate = optionalDateInput(body, 'expiryDate');
+  const plateNumber = optionalSafeMetadataString(body, 'plateNumber', 15)?.replace(/\s+/g, ' ').toUpperCase() || null;
+  const vin = optionalSafeMetadataString(body, 'vin', 17)?.toUpperCase() || null;
   const referenceNumber = optionalSafeMetadataString(body, 'referenceNumber', 80);
   const ocrAssisted = body.ocrAssisted === undefined || body.ocrAssisted === null ? false : body.ocrAssisted;
 
@@ -389,6 +404,15 @@ const finalizeUpload = async (uid, body) => {
 
   if (!Number.isFinite(cost) || cost < 0 || cost > 1000000) {
     throw Object.assign(new Error('Invalid document cost'), { statusCode: 400 });
+  }
+  if (Math.abs(Math.round(cost * 100) - cost * 100) > Number.EPSILON * 100) {
+    throw Object.assign(new Error('Document cost can have at most two decimal places'), { statusCode: 400 });
+  }
+  if (plateNumber && (!PLATE.test(plateNumber) || !/[A-Z]/.test(plateNumber) || !/\d/.test(plateNumber))) {
+    throw Object.assign(new Error('Invalid plateNumber'), { statusCode: 400 });
+  }
+  if (vin && !VIN.test(vin)) {
+    throw Object.assign(new Error('Invalid vin'), { statusCode: 400 });
   }
 
   await verifyR2Object({ key, contentType, size });

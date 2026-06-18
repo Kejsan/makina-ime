@@ -10,6 +10,7 @@ import type { Document } from '../lib/types';
 import { useAuth } from '../context/AuthContext';
 import { callR2DocumentFunction } from '../lib/r2Documents';
 import type { OcrFieldKey, OcrResult } from '../lib/ocr';
+import { isValidDateInput, normalizePlate, normalizeVin, parseMoney, plateError, vinError } from '../lib/validation';
 
 interface CreateUploadUrlResponse {
     documentId: string;
@@ -64,6 +65,7 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
     const [plateNumber, setPlateNumber] = useState('');
     const [vin, setVin] = useState('');
     const [referenceNumber, setReferenceNumber] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!vehicleId) return;
@@ -124,6 +126,7 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
         setPlateNumber('');
         setVin('');
         setReferenceNumber('');
+        setFieldErrors({});
     };
 
     const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,6 +158,19 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
 
     const handleConfirmedUpload = async () => {
         if (!pendingFile || !vehicleId || !user) return;
+
+        const nextErrors: Record<string, string> = {};
+        const parsedCost = parseMoney(cost);
+        const plateValidationError = plateError(plateNumber);
+        const vinValidationError = vinError(vin);
+        if (parsedCost.error) nextErrors.cost = parsedCost.error;
+        if (plateValidationError) nextErrors.plateNumber = plateValidationError;
+        if (vinValidationError) nextErrors.vin = vinValidationError;
+        if (issueDate && !isValidDateInput(issueDate)) nextErrors.issueDate = 'Enter a valid issue date.';
+        if (expiryDate && !isValidDateInput(expiryDate)) nextErrors.expiryDate = 'Enter a valid expiry date.';
+        if (referenceNumber.trim().length > 80) nextErrors.referenceNumber = 'Reference number must be 80 characters or fewer.';
+        setFieldErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0) return;
 
         setUploading(true);
         setError('');
@@ -189,10 +205,10 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
                 size: pendingFile.size,
                 issueDate: issueDate || null,
                 expiryDate: expiryDate || null,
-                cost: cost ? parseFloat(cost) : 0,
-                plateNumber: plateNumber || null,
-                vin: vin || null,
-                referenceNumber: referenceNumber || null,
+                cost: parsedCost.value ?? 0,
+                plateNumber: normalizePlate(plateNumber) || null,
+                vin: normalizeVin(vin) || null,
+                referenceNumber: referenceNumber.trim() || null,
                 ocrAssisted: Boolean(ocrResult),
             });
 
@@ -332,42 +348,42 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
                                 <label className="mi-label">Policy / certificate no.</label>
                                 <FieldConfidence field="referenceNumber" />
                             </div>
-                            <Input value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} disabled={uploading} />
+                            <Input value={referenceNumber} maxLength={80} error={fieldErrors.referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} disabled={uploading} />
                         </div>
                         <div className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
                                 <label className="mi-label">Issue date</label>
                                 <FieldConfidence field="issueDate" />
                             </div>
-                            <Input type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} disabled={uploading} />
+                            <Input type="date" value={issueDate} error={fieldErrors.issueDate} onChange={(event) => setIssueDate(event.target.value)} disabled={uploading} />
                         </div>
                         <div className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
                                 <label className="mi-label">Expiry date</label>
                                 <FieldConfidence field="expiryDate" />
                             </div>
-                            <Input type="date" value={expiryDate} onChange={(event) => setExpiryDate(event.target.value)} disabled={uploading} />
+                            <Input type="date" value={expiryDate} error={fieldErrors.expiryDate} onChange={(event) => setExpiryDate(event.target.value)} disabled={uploading} />
                         </div>
                         <div className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
                                 <label className="mi-label">Cost (€)</label>
                                 <FieldConfidence field="cost" />
                             </div>
-                            <Input type="number" placeholder="0.00" value={cost} onChange={(event) => setCost(event.target.value)} disabled={uploading} />
+                            <Input type="text" inputMode="decimal" maxLength={13} placeholder="0.00" value={cost} error={fieldErrors.cost} onChange={(event) => setCost(event.target.value)} disabled={uploading} />
                         </div>
                         <div className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
                                 <label className="mi-label">Plate number</label>
                                 <FieldConfidence field="plateNumber" />
                             </div>
-                            <Input value={plateNumber} onChange={(event) => setPlateNumber(event.target.value)} disabled={uploading} />
+                            <Input value={plateNumber} maxLength={15} autoCapitalize="characters" spellCheck={false} error={fieldErrors.plateNumber} onChange={(event) => setPlateNumber(event.target.value)} disabled={uploading} />
                         </div>
                         <div className="space-y-2 sm:col-span-2">
                             <div className="flex items-center justify-between gap-2">
                                 <label className="mi-label">VIN</label>
                                 <FieldConfidence field="vin" />
                             </div>
-                            <Input value={vin} onChange={(event) => setVin(event.target.value)} disabled={uploading} />
+                            <Input value={vin} maxLength={17} autoCapitalize="characters" spellCheck={false} error={fieldErrors.vin} onChange={(event) => setVin(event.target.value)} disabled={uploading} />
                         </div>
                     </div>
 
