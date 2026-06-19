@@ -16,7 +16,7 @@ import {
     X,
 } from 'lucide-react';
 import { addDoc, collection, doc, onSnapshot, orderBy, query, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -75,6 +75,7 @@ export const Dashboard = () => {
     const { user } = useAuth();
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [expensesByVehicle, setExpensesByVehicle] = useState<Record<string, ExpenseRecord[]>>({});
     const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -111,6 +112,7 @@ export const Dashboard = () => {
         notes: '',
     });
 
+    /* eslint-disable react-hooks/set-state-in-effect -- query parameters intentionally drive modal state */
     useEffect(() => {
         if (!user) return;
 
@@ -298,7 +300,12 @@ export const Dashboard = () => {
     };
 
     useEffect(() => {
-        const handleQuickAdd = () => {
+        const action = searchParams.get('add');
+        if (action === 'vehicle') {
+            setIsVehicleModalOpen(true);
+            return;
+        }
+        if (action === 'expense') {
             const defaultVehicleId = selectedVehicleFilter !== 'all' ? selectedVehicleFilter : vehicles[0]?.id || '';
             if (!defaultVehicleId) {
                 setIsVehicleModalOpen(true);
@@ -315,11 +322,9 @@ export const Dashboard = () => {
             });
             setExpenseSaveError('');
             setIsExpenseCreateOpen(true);
-        };
-
-        window.addEventListener('makina-ime:quick-add', handleQuickAdd);
-        return () => window.removeEventListener('makina-ime:quick-add', handleQuickAdd);
-    }, [selectedVehicleFilter, vehicles]);
+        }
+    }, [searchParams, selectedVehicleFilter, vehicles]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const handleCreateExpense = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -549,7 +554,7 @@ export const Dashboard = () => {
                                         <AppSurface
                                             key={vehicle.id}
                                             className={`cursor-pointer p-5 transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 ${isSelected ? 'border-primary ring-2 ring-primary/20' : ''}`}
-                                            onClick={() => navigate(`/vehicle/${vehicle.id}`)}
+                                            onClick={() => navigate(`/personal/vehicles/${vehicle.id}`)}
                                         >
                                             <div className="mb-4 flex items-start justify-between gap-3">
                                                 <div className="flex min-w-0 items-center gap-3">

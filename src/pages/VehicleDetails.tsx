@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, Timestamp } from 'firebase/firestore';
 import { ArrowLeft, Bell, Calendar, Car, DollarSign, FileText, Pencil, Wrench, X } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -30,6 +30,7 @@ const tabs: { id: VehicleTab; label: string; icon: React.ElementType }[] = [
 export const VehicleDetails = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<VehicleTab>('overview');
@@ -62,7 +63,7 @@ export const VehicleDetails = () => {
             if (snapshot.exists()) {
                 setVehicle({ id: snapshot.id, ...snapshot.data() } as Vehicle);
             } else {
-                navigate('/app');
+                navigate('/personal');
             }
             setLoading(false);
         });
@@ -70,14 +71,27 @@ export const VehicleDetails = () => {
     }, [id, navigate]);
 
     useEffect(() => {
-        const handleQuickAdd = () => {
-            if (activeTab === 'overview') setActiveTab('expenses');
-            setQuickAddToken((current) => current + 1);
+        const section = searchParams.get('section') as VehicleTab | null;
+        if (section && tabs.some((tab) => tab.id === section)) setActiveTab(section);
+        const action = searchParams.get('add');
+        const tabByAction: Partial<Record<string, VehicleTab>> = {
+            expense: 'expenses',
+            service: 'services',
+            document: 'documents',
+            reminder: 'reminders',
         };
-
-        window.addEventListener('makina-ime:quick-add', handleQuickAdd);
-        return () => window.removeEventListener('makina-ime:quick-add', handleQuickAdd);
-    }, [activeTab]);
+        if (action === 'mileage') {
+            openEditModal();
+            return;
+        }
+        const nextTab = action ? tabByAction[action] : undefined;
+        if (nextTab) {
+            setActiveTab(nextTab);
+            setQuickAddToken((current) => current + 1);
+        }
+        // openEditModal intentionally reads the current vehicle loaded by the snapshot.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, vehicle]);
 
     const formatDateInput = (timestamp?: Timestamp | null) => {
         if (!timestamp?.toDate) return '';
@@ -163,7 +177,7 @@ export const VehicleDetails = () => {
     return (
         <Layout>
             <div className="space-y-6">
-                <Button variant="ghost" onClick={() => navigate('/app')} className="pl-0 text-muted-foreground hover:bg-transparent hover:text-foreground">
+                <Button variant="ghost" onClick={() => navigate('/personal')} className="pl-0 text-muted-foreground hover:bg-transparent hover:text-foreground">
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back to dashboard
                 </Button>

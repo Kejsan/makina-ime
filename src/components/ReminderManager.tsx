@@ -32,11 +32,13 @@ export const ReminderManager = ({
     ownerId,
     organizationId,
     quickAddToken = 0,
+    canEditAll = true,
 }: {
     ownerType?: 'personal' | 'organization';
     ownerId?: string;
     organizationId?: string;
     quickAddToken?: number;
+    canEditAll?: boolean;
 }) => {
     const { id: vehicleId } = useParams<{ id: string }>();
     const { user } = useAuth();
@@ -116,7 +118,7 @@ export const ReminderManager = ({
             })) as Reminder[];
             
             // Sort by due date asc (soonest first)
-            setReminders(data.sort((a, b) => 
+            setReminders(data.filter((reminder) => !reminder.archivedAt).sort((a, b) =>
                 (a.dueDate?.seconds || 0) - (b.dueDate?.seconds || 0)
             ));
             setLoadError('');
@@ -194,6 +196,7 @@ export const ReminderManager = ({
                 leadTimeDays: leadTime.value,
                 recurrence,
                 updatedAt: serverTimestamp(),
+                updatedBy: user.uid,
             };
 
             if (editingReminder) {
@@ -204,6 +207,7 @@ export const ReminderManager = ({
                     ownerType,
                     ownerId: ownerId || user.uid,
                     organizationId: organizationId || null,
+                    createdBy: user.uid,
                     vehicleId,
                     ...payload,
                     completed: false,
@@ -224,7 +228,9 @@ export const ReminderManager = ({
         if (!confirm('Mark this reminder as completed?')) return;
         try {
             await updateDoc(doc(db, 'reminders', id), {
-                completed: true
+                completed: true,
+                updatedAt: serverTimestamp(),
+                updatedBy: user?.uid || null,
             });
         } catch {
             console.error('Reminder completion failed');
@@ -232,9 +238,10 @@ export const ReminderManager = ({
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this reminder?')) return;
+        if (!confirm(ownerType === 'organization' ? 'Archive this reminder?' : 'Delete this reminder?')) return;
         try {
-            await deleteDoc(doc(db, 'reminders', id));
+            if (ownerType === 'organization') await updateDoc(doc(db, 'reminders', id), { archivedAt: serverTimestamp(), archivedBy: user?.uid || null, updatedAt: serverTimestamp(), updatedBy: user?.uid || null });
+            else await deleteDoc(doc(db, 'reminders', id));
         } catch {
             console.error('Reminder deletion failed');
         }
@@ -354,6 +361,7 @@ export const ReminderManager = ({
                     {allReminderItems.map((reminder) => {
                         const daysLeft = getDaysRemaining(reminder.dueDate);
                         const isUrgent = daysLeft <= 7;
+                        const canEditReminder = canEditAll || reminder.createdBy === user?.uid || reminder.userId === user?.uid;
                         
                         return (
                             <AppSurface key={reminder.id} className={cn("p-4 flex items-center justify-between", isUrgent ? "border-amber-500/50 bg-amber-500/5" : "")}>
@@ -375,7 +383,7 @@ export const ReminderManager = ({
                                         </div>
                                     </div>
                                 </div>
-                                {reminder.source !== 'vehicle' && (
+                                {reminder.source !== 'vehicle' && canEditReminder && (
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => openEditForm(reminder)}

@@ -13,6 +13,7 @@ import { db } from '../lib/firebase';
 import type { Reminder, Vehicle } from '../lib/types';
 import { getVehicleComplianceDeadlines } from '../lib/business';
 import { isValidDateInput, parseInteger } from '../lib/validation';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -31,6 +32,7 @@ type CalendarReminder = Reminder & {
 export const CalendarPage = () => {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const { workspaceType, organizationId } = useWorkspace();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [reminders, setReminders] = useState<Reminder[]>([]);
     const [vehicleFilter, setVehicleFilter] = useState('all');
@@ -52,31 +54,37 @@ export const CalendarPage = () => {
 
     useEffect(() => {
         if (!user) return;
-        const unsubscribe = onSnapshot(query(collection(db, 'vehicles'), where('userId', '==', user.uid)), (snapshot) => {
+        const vehiclesQuery = workspaceType === 'business' && organizationId
+            ? query(collection(db, 'vehicles'), where('ownerType', '==', 'organization'), where('ownerId', '==', organizationId))
+            : query(collection(db, 'vehicles'), where('userId', '==', user.uid));
+        const unsubscribe = onSnapshot(vehiclesQuery, (snapshot) => {
             setVehicles(snapshot.docs
                 .map((item) => ({ id: item.id, ...item.data() } as Vehicle))
-                .filter((vehicle) => vehicle.ownerType !== 'organization'));
+                .filter((vehicle) => workspaceType === 'business' ? vehicle.ownerType === 'organization' : vehicle.ownerType !== 'organization'));
             setLoadError('');
         }, (error) => {
             console.error('Calendar vehicles listener failed', error);
             setLoadError('Calendar data could not be loaded. Please check your account permissions and try again.');
         });
         return unsubscribe;
-    }, [user]);
+    }, [organizationId, user, workspaceType]);
 
     useEffect(() => {
         if (!user) return;
-        const unsubscribe = onSnapshot(query(collection(db, 'reminders'), where('userId', '==', user.uid)), (snapshot) => {
+        const remindersQuery = workspaceType === 'business' && organizationId
+            ? query(collection(db, 'reminders'), where('ownerType', '==', 'organization'), where('ownerId', '==', organizationId))
+            : query(collection(db, 'reminders'), where('userId', '==', user.uid));
+        const unsubscribe = onSnapshot(remindersQuery, (snapshot) => {
             setReminders(snapshot.docs
                 .map((item) => ({ id: item.id, ...item.data() } as Reminder))
-                .filter((reminder) => reminder.ownerType !== 'organization'));
+                .filter((reminder) => workspaceType === 'business' ? reminder.ownerType === 'organization' : reminder.ownerType !== 'organization'));
             setLoadError('');
         }, (error) => {
             console.error('Calendar reminders listener failed', error);
             setLoadError('Calendar data could not be loaded. Please check your account permissions and try again.');
         });
         return unsubscribe;
-    }, [user]);
+    }, [organizationId, user, workspaceType]);
 
     const vehicleName = (vehicleId: string) => {
         const vehicle = vehicles.find((item) => item.id === vehicleId);
@@ -90,8 +98,9 @@ export const CalendarPage = () => {
             id: `vehicle-${vehicle.id}-${deadline.key}`,
             userId: user?.uid || '',
             vehicleId: vehicle.id,
-            ownerType: 'personal' as const,
-            ownerId: user?.uid,
+            ownerType: workspaceType === 'business' ? 'organization' as const : 'personal' as const,
+            ownerId: workspaceType === 'business' ? organizationId || undefined : user?.uid,
+            organizationId: workspaceType === 'business' ? organizationId || undefined : undefined,
             type: deadline.key === 'insurance' ? 'insurance' : deadline.key === 'tax' ? 'tax' : 'inspection',
             title: deadline.label,
             dueDate: Timestamp.fromDate(deadline.date),
@@ -103,7 +112,7 @@ export const CalendarPage = () => {
         }))).filter((item) => !explicitKeys.has(`${item.vehicleId}-${item.type}-${item.dueDate.seconds}-${item.title}`));
 
         return [...explicitReminders, ...vehicleDeadlines];
-    }, [reminders, user?.uid, vehicles]);
+    }, [organizationId, reminders, user?.uid, vehicles, workspaceType]);
 
     const filteredReminders = useMemo(() => calendarReminders
         .filter((reminder) => !reminder.completed && reminder.dueDate?.toDate)
@@ -144,8 +153,10 @@ export const CalendarPage = () => {
         try {
             await addDoc(collection(db, 'reminders'), {
                 userId: user.uid,
-                ownerType: 'personal',
-                ownerId: user.uid,
+                ownerType: workspaceType === 'business' ? 'organization' : 'personal',
+                ownerId: workspaceType === 'business' ? organizationId : user.uid,
+                organizationId: workspaceType === 'business' ? organizationId : null,
+                createdBy: user.uid,
                 vehicleId: customReminder.vehicleId,
                 title: customReminder.title.trim(),
                 type: customReminder.type,
@@ -154,6 +165,8 @@ export const CalendarPage = () => {
                 recurrence: customReminder.recurrence,
                 completed: false,
                 createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                updatedBy: user.uid,
             });
             setIsCustomOpen(false);
             setFormErrors({});

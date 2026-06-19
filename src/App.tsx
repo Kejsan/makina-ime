@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useParams } from 'react-router-dom';
 import { LocalizedDom } from './components/LocalizedDom';
 import { PublicDevelopmentWarning } from './components/DevelopmentNotice';
 import { ThemeProvider } from './context/ThemeContext';
@@ -68,6 +68,13 @@ const ScrollToTop = () => {
   return null;
 };
 
+const LegacyRedirect = ({ to }: { to: string | ((params: Readonly<Record<string, string | undefined>>) => string) }) => {
+  const params = useParams();
+  const location = useLocation();
+  const target = typeof to === 'function' ? to(params) : to;
+  return <Navigate to={`${target}${location.search}${location.hash}`} replace />;
+};
+
 function App() {
   return (
     <ThemeProvider>
@@ -84,14 +91,15 @@ function App() {
               <Route path="/cookies" element={<LegalPage type="cookies" />} />
               <Route path="/terms" element={<LegalPage type="terms" />} />
               <Route
-                path="/app"
+                path="/personal"
                 element={
                   <AuthenticatedRoute requireUser>
                     <Dashboard />
                   </AuthenticatedRoute>
                 }
               />
-              <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+              <Route path="/app" element={<LegacyRedirect to="/personal" />} />
+              <Route path="/dashboard" element={<LegacyRedirect to="/personal" />} />
               <Route
                 path="/business"
                 element={
@@ -109,15 +117,16 @@ function App() {
                 }
               />
               <Route
-                path="/business/:orgId/vehicle/:id"
+                path="/business/:orgId/vehicles/:id"
                 element={
                   <AuthenticatedRoute requireUser>
                     <BusinessVehicleDetails />
                   </AuthenticatedRoute>
                 }
               />
+              <Route path="/business/:orgId/vehicle/:id" element={<LegacyRedirect to={(params) => `/business/${params.orgId}/vehicles/${params.id}`} />} />
               <Route
-                path="/calendar"
+                path="/business/:orgId/calendar"
                 element={
                   <AuthenticatedRoute requireUser>
                     <CalendarPage />
@@ -125,21 +134,32 @@ function App() {
                 }
               />
               <Route
-                path="/profile"
+                path="/personal/calendar"
+                element={
+                  <AuthenticatedRoute requireUser>
+                    <CalendarPage />
+                  </AuthenticatedRoute>
+                }
+              />
+              <Route path="/calendar" element={<LegacyRedirect to="/personal/calendar" />} />
+              <Route
+                path="/account"
                 element={
                   <AuthenticatedRoute requireUser>
                     <ProfileSettings />
                   </AuthenticatedRoute>
                 }
               />
+              <Route path="/profile" element={<LegacyRedirect to="/account" />} />
               <Route
-                path="/vehicle/:id"
+                path="/personal/vehicles/:id"
                 element={
                   <AuthenticatedRoute requireUser>
                     <VehicleDetails />
                   </AuthenticatedRoute>
                 }
               />
+              <Route path="/vehicle/:id" element={<LegacyRedirect to={(params) => `/personal/vehicles/${params.id}`} />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

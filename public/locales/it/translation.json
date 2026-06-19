@@ -767,5 +767,12 @@
   "Enter a valid due date.": "Inserisci una data di scadenza valida.",
   "Enter a valid expense date.": "Inserisci una data di spesa valida.",
   "Enter a valid expiry date.": "Inserisci una data di validita valida.",
-  "Enter a valid issue date.": "Inserisci una data di emissione valida."
+  "Enter a valid issue date.": "Inserisci una data di emissione valida.",
+  "Authentication failed. Check your details and try again.": "Autenticazione non riuscita. Controlla i dati e riprova.",
+  "Run shared vehicles with clear responsibility.": "Gestisci i veicoli condivisi con responsabilita chiare.",
+  "Keep your own vehicles organized.": "Mantieni organizzati i tuoi veicoli.",
+  "Use a team workspace for vehicles, compliance, maintenance, costs, assignments, and work orders.": "Usa uno spazio di squadra per veicoli, conformita, manutenzione, costi, assegnazioni e ordini di lavoro.",
+  "Keep vehicle details, documents, services, reminders, and expenses together without mixing them with business records.": "Tieni insieme dati, documenti, servizi, promemoria e spese senza mescolarli ai registri aziendali.",
+  "Shared organization fleet": "Flotta condivisa dell'organizzazione",
+  "Inspections and work orders": "Ispezioni e ordini di lavoro"
 }

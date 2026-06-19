@@ -1041,5 +1041,12 @@
   "Enter a valid due date.": "Vendosni nje date afati te vlefshme.",
   "Enter a valid expense date.": "Vendosni nje date shpenzimi te vlefshme.",
   "Enter a valid expiry date.": "Vendosni nje date skadence te vlefshme.",
-  "Enter a valid issue date.": "Vendosni nje date leshimi te vlefshme."
+  "Enter a valid issue date.": "Vendosni nje date leshimi te vlefshme.",
+  "Authentication failed. Check your details and try again.": "Hyrja deshtoi. Kontrolloni te dhenat dhe provoni perseri.",
+  "Run shared vehicles with clear responsibility.": "Menaxhoni mjetet e perbashketa me pergjegjesi te qarta.",
+  "Keep your own vehicles organized.": "Mbani mjetet tuaja te organizuara.",
+  "Use a team workspace for vehicles, compliance, maintenance, costs, assignments, and work orders.": "Perdorni nje hapesire ekipi per mjetet, pajtueshmerine, mirembajtjen, kostot, caktimet dhe urdhrat e punes.",
+  "Keep vehicle details, documents, services, reminders, and expenses together without mixing them with business records.": "Mbani te dhenat, dokumentet, sherbimet, kujtesat dhe shpenzimet e mjetit bashke pa i perzier me regjistrat e biznesit.",
+  "Shared organization fleet": "Flote e perbashket e organizates",
+  "Inspections and work orders": "Inspektime dhe urdhra pune"
 }

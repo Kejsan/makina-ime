@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle, Download, FileText, Loader2, ScanText, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, Download, FileText, Loader2, Pencil, ScanText, Trash2, Upload, X } from 'lucide-react';
 import { collection, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { useParams } from 'react-router-dom';
 import { Button } from './ui/Button';
@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import { callR2DocumentFunction } from '../lib/r2Documents';
 import type { OcrFieldKey, OcrResult } from '../lib/ocr';
 import { isValidDateInput, normalizePlate, normalizeVin, parseMoney, plateError, vinError } from '../lib/validation';
+import { Modal } from './ui/Modal';
+import { DetailRows, RecordDetailsSheet, useRecordDetails } from './RecordDetailsSheet';
 
 interface CreateUploadUrlResponse {
     documentId: string;
@@ -66,6 +68,10 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
     const [vin, setVin] = useState('');
     const [referenceNumber, setReferenceNumber] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [editingDocument, setEditingDocument] = useState<Document | null>(null);
+    const [editName, setEditName] = useState('');
+    const { selectedId, openRecord, closeRecord } = useRecordDetails('document');
+    const selectedDocument = documents.find((documentRecord) => documentRecord.id === selectedId) || null;
 
     useEffect(() => {
         if (!vehicleId) return;
@@ -81,7 +87,7 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
                 ...snapshotDoc.data(),
             })) as Document[];
 
-            setDocuments(docsData.sort((a, b) => (b.uploadedAt?.seconds || 0) - (a.uploadedAt?.seconds || 0)));
+            setDocuments(docsData.filter((documentRecord) => !documentRecord.archivedAt).sort((a, b) => (b.uploadedAt?.seconds || 0) - (a.uploadedAt?.seconds || 0)));
             setError('');
             setLoading(false);
         }, (listenerError) => {
@@ -242,7 +248,8 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
     };
 
     const handleDelete = async (documentRecord: Document) => {
-        if (!confirm('Are you sure you want to delete this document?')) return;
+        const businessDocument = documentRecord.ownerType === 'organization' || Boolean(documentRecord.organizationId);
+        if (!confirm(businessDocument ? 'Archive this document?' : 'Are you sure you want to delete this document?')) return;
         if (!vehicleId || !user) return;
 
         try {
@@ -258,6 +265,56 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
         } catch (err) {
             console.error('Document deletion failed');
             setError(err instanceof Error ? err.message : 'Failed to delete document.');
+        }
+    };
+
+    const openMetadataEditor = (documentRecord: Document) => {
+        setEditingDocument(documentRecord);
+        setEditName(documentRecord.name || '');
+        setDocumentType(documentRecord.type || 'other');
+        setIssueDate(documentRecord.issueDate || '');
+        setExpiryDate(documentRecord.expiryDate || '');
+        setCost(documentRecord.cost ? String(documentRecord.cost) : '');
+        setPlateNumber(documentRecord.plateNumber || '');
+        setVin(documentRecord.vin || '');
+        setReferenceNumber(documentRecord.referenceNumber || '');
+        setFieldErrors({});
+    };
+
+    const saveMetadata = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!editingDocument || !vehicleId || !user) return;
+        const parsedCost = parseMoney(cost);
+        const nextPlateError = plateError(plateNumber);
+        const nextVinError = vinError(vin);
+        const nextErrors: Record<string, string> = {};
+        if (!editName.trim() || editName.trim().length > 180) nextErrors.name = 'Name is required and must be 180 characters or fewer.';
+        if (parsedCost.error) nextErrors.cost = parsedCost.error;
+        if (issueDate && !isValidDateInput(issueDate)) nextErrors.issueDate = 'Enter a valid issue date.';
+        if (expiryDate && !isValidDateInput(expiryDate)) nextErrors.expiryDate = 'Enter a valid expiry date.';
+        if (nextPlateError) nextErrors.plateNumber = nextPlateError;
+        if (nextVinError) nextErrors.vin = nextVinError;
+        setFieldErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0) return;
+        setUploading(true);
+        try {
+            await callR2DocumentFunction(user, 'updateDocumentMetadata', {
+                vehicleId,
+                documentId: editingDocument.id,
+                name: editName.trim(),
+                type: documentType,
+                issueDate: issueDate || null,
+                expiryDate: expiryDate || null,
+                cost: parsedCost.value ?? 0,
+                plateNumber: normalizePlate(plateNumber) || null,
+                vin: normalizeVin(vin) || null,
+                referenceNumber: referenceNumber.trim() || null,
+            });
+            setEditingDocument(null);
+        } catch (editError) {
+            setError(editError instanceof Error ? editError.message : 'Document update failed.');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -419,7 +476,7 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
             ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {documents.map((documentRecord) => (
-                        <AppSurface key={documentRecord.id} className="group flex items-center justify-between p-4 transition-colors hover:border-primary/50">
+                        <AppSurface key={documentRecord.id} role="button" tabIndex={0} onClick={() => openRecord(documentRecord.id)} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) { event.preventDefault(); openRecord(documentRecord.id); } }} className="group flex cursor-pointer items-center justify-between p-4 transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                             <div className="flex min-w-0 items-center gap-3">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                                     <FileText className="h-5 w-5 text-primary" />
@@ -440,14 +497,21 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => handleDownload(documentRecord)}
+                                    onClick={(event) => { event.stopPropagation(); void handleDownload(documentRecord); }}
                                     className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                                     title="Download"
                                 >
                                     <Download className="h-4 w-4" />
                                 </button>
                                 <button
-                                    onClick={() => handleDelete(documentRecord)}
+                                    onClick={(event) => { event.stopPropagation(); openMetadataEditor(documentRecord); }}
+                                    className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-primary"
+                                    title="Edit metadata"
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </button>
+                                <button
+                                    onClick={(event) => { event.stopPropagation(); void handleDelete(documentRecord); }}
                                     className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                                     title="Delete"
                                 >
@@ -457,6 +521,39 @@ export const DocumentManager = ({ quickAddToken = 0 }: { quickAddToken?: number 
                         </AppSurface>
                     ))}
                 </div>
+            )}
+            {selectedDocument && (
+                <RecordDetailsSheet eyebrow="Vehicle document" title={selectedDocument.name} onClose={closeRecord} onEdit={() => { openMetadataEditor(selectedDocument); closeRecord(); }} onDelete={() => { closeRecord(); void handleDelete(selectedDocument); }} deleteLabel={selectedDocument.ownerType === 'organization' || selectedDocument.organizationId ? 'Archive' : 'Delete'}>
+                    <DetailRows rows={[
+                        ['Type', selectedDocument.type],
+                        ['Issue date', selectedDocument.issueDate],
+                        ['Expiry date', selectedDocument.expiryDate],
+                        ['Cost', selectedDocument.cost ? `€${selectedDocument.cost.toFixed(2)}` : 'No cost'],
+                        ['Plate', selectedDocument.plateNumber],
+                        ['VIN', selectedDocument.vin],
+                        ['Reference', selectedDocument.referenceNumber],
+                        ['Uploaded', selectedDocument.uploadedAt?.toDate?.().toLocaleString()],
+                    ]} />
+                    <Button variant="outline" className="mt-4 w-full" onClick={() => void handleDownload(selectedDocument)}><Download className="mr-2 h-4 w-4" />Open file</Button>
+                </RecordDetailsSheet>
+            )}
+            {editingDocument && (
+                <Modal onClose={() => setEditingDocument(null)} titleId="edit-document-title" className="max-w-lg">
+                    <h2 id="edit-document-title" className="mb-4 text-xl font-bold">Edit document metadata</h2>
+                    <form onSubmit={saveMetadata} className="space-y-4">
+                        <Input label="Name" value={editName} maxLength={180} error={fieldErrors.name} onChange={(event) => setEditName(event.target.value)} required />
+                        <label className="block space-y-2"><span className="mi-label">Document type</span><select className="mi-field" value={documentType} onChange={(event) => setDocumentType(event.target.value)}>{documentTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Input label="Issue date" type="date" value={issueDate} error={fieldErrors.issueDate} onChange={(event) => setIssueDate(event.target.value)} />
+                            <Input label="Expiry date" type="date" value={expiryDate} error={fieldErrors.expiryDate} onChange={(event) => setExpiryDate(event.target.value)} />
+                            <Input label="Cost" inputMode="decimal" value={cost} error={fieldErrors.cost} onChange={(event) => setCost(event.target.value)} />
+                            <Input label="Plate" maxLength={15} value={plateNumber} error={fieldErrors.plateNumber} onChange={(event) => setPlateNumber(event.target.value)} />
+                            <Input label="VIN" maxLength={17} value={vin} error={fieldErrors.vin} onChange={(event) => setVin(event.target.value)} />
+                            <Input label="Reference" maxLength={80} value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} />
+                        </div>
+                        <div className="flex gap-2"><Button type="submit" className="flex-1" isLoading={uploading}>Save metadata</Button><Button type="button" variant="outline" onClick={() => setEditingDocument(null)}>Cancel</Button></div>
+                    </form>
+                </Modal>
             )}
         </div>
     );

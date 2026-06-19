@@ -10,16 +10,19 @@ import {
     LogOut,
     Plus,
     User,
+    Wrench,
 } from 'lucide-react';
 import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebase';
 import { cn } from '../../lib/utils';
 import { NotificationCenter } from '../NotificationCenter';
+import { QuickAddSheet } from '../QuickAddSheet';
 import { PwaInstallButton } from '../PwaInstallButton';
 import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../DevelopmentNotice';
 import { ThemeToggle } from './design-system';
 import logo from '../../assets/Makina Ime Logo.webp';
+import { useWorkspace } from '../../context/WorkspaceContext';
 
 interface SidebarItemProps {
     icon: React.ElementType;
@@ -61,6 +64,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const { workspaceType, organizationId, switchWorkspace } = useWorkspace();
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
@@ -103,28 +107,51 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     };
 
     const handleQuickAdd = () => {
-        window.dispatchEvent(new CustomEvent('makina-ime:quick-add'));
+        const params = new URLSearchParams(location.search);
+        params.set('add', 'choose');
+        navigate(`${location.pathname}?${params.toString()}`);
     };
 
-    const navItems = [
-        { icon: LayoutDashboard, label: t('Dashboard'), href: '/app' },
-        { icon: Building2, label: 'Business', href: '/business' },
-        { icon: CalendarDays, label: t('Calendar'), href: '/calendar' },
-        { icon: User, label: t('Profile'), href: '/profile' },
-    ];
+    const workspaceHome = workspaceType === 'business' ? (organizationId ? `/business/${organizationId}` : '/business') : '/personal';
+    const navItems = workspaceType === 'business'
+        ? [
+            { icon: LayoutDashboard, label: 'Overview', href: workspaceHome },
+            { icon: Car, label: 'Fleet', href: `${workspaceHome}#fleet-register` },
+            { icon: Wrench, label: 'Work', href: `${workspaceHome}?view=work` },
+            { icon: CalendarDays, label: 'Calendar', href: organizationId ? `/business/${organizationId}/calendar` : '/business' },
+            { icon: User, label: t('Account'), href: `/account?workspace=business${organizationId ? `&org=${organizationId}` : ''}` },
+        ]
+        : [
+            { icon: LayoutDashboard, label: t('Dashboard'), href: '/personal' },
+            { icon: Car, label: t('Garage'), href: '/personal#garage-section' },
+            { icon: CalendarDays, label: t('Calendar'), href: '/personal/calendar' },
+            { icon: User, label: t('Account'), href: '/account?workspace=personal' },
+        ];
 
     return (
         <div className="min-h-screen bg-background text-foreground">
             <div className="flex min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
                 <aside className="hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-border/80 bg-card p-5 md:sticky md:top-0 md:flex">
                     <div>
-                        <Link to="/app" className="mb-8 flex items-center gap-3">
+                        <Link to={workspaceHome} className="mb-5 flex items-center gap-3">
                             <img src={logo} alt="Makina Ime" width="658" height="658" className="h-10 w-auto object-contain" />
                             <div>
                                 <p className="text-sm font-extrabold tracking-tight">Makina Ime</p>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">App Dashboard</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{workspaceType === 'business' ? 'Business Fleet' : 'Personal Garage'}</p>
                             </div>
                         </Link>
+
+                        <button
+                            type="button"
+                            onClick={() => void switchWorkspace(workspaceType === 'business' ? 'personal' : 'business')}
+                            className="mb-6 flex w-full items-center justify-between rounded-xl border border-border bg-background/50 px-3 py-2 text-left"
+                        >
+                            <span>
+                                <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Workspace</span>
+                                <span className="text-sm font-semibold">{workspaceType === 'business' ? 'Business' : 'Personal'}</span>
+                            </span>
+                            {workspaceType === 'business' ? <Building2 className="h-4 w-4 text-indigo-400" /> : <Car className="h-4 w-4 text-emerald-400" />}
+                        </button>
 
                         <nav className="space-y-2">
                             {navItems.map((item) => (
@@ -133,7 +160,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                                     icon={item.icon}
                                     label={item.label}
                                     href={item.href}
-                                    isActive={item.href === '/business' ? location.pathname.startsWith('/business') : location.pathname === item.href}
+                                    isActive={location.pathname === item.href.split(/[?#]/)[0] || (item.label === 'Fleet' && location.pathname.includes('/vehicles/'))}
                                 />
                             ))}
                         </nav>
@@ -177,18 +204,22 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
                 <main className="min-w-0 flex-1">
                     <header className="sticky top-0 z-30 flex min-h-16 min-w-0 items-center justify-between gap-2 border-b border-border/80 bg-background px-4 pt-safe md:hidden">
-                        <Link to="/app" className="flex min-w-0 items-center gap-2.5">
+                        <Link to={workspaceHome} className="flex min-w-0 items-center gap-2.5">
                             <img src={logo} alt="Makina Ime" width="658" height="658" className="h-8 w-auto object-contain" />
+                            <span className={`hidden rounded-lg px-2 py-1 text-[10px] font-bold uppercase min-[350px]:inline ${workspaceType === 'business' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                                {workspaceType === 'business' ? 'Business' : 'Personal'}
+                            </span>
                         </Link>
                         <div className="flex shrink-0 items-center gap-2">
-                            <Link
-                                to="/business"
-                                aria-label={t('Business')}
-                                title={t('Business')}
+                            <button
+                                type="button"
+                                onClick={() => void switchWorkspace(workspaceType === 'business' ? 'personal' : 'business')}
+                                aria-label="Switch workspace"
+                                title="Switch workspace"
                                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-accent/60 text-muted-foreground hover:text-foreground"
                             >
-                                <Building2 className="h-4 w-4" />
-                            </Link>
+                                {workspaceType === 'business' ? <Car className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                            </button>
                             <PwaInstallButton compact autoOffer />
                             <ThemeToggle className="h-9 w-9" />
                             <div className="relative">
@@ -218,8 +249,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             </div>
 
             <nav className="px-safe fixed bottom-0 left-0 right-0 z-40 grid min-w-0 grid-cols-5 items-end border-t border-border/80 bg-card py-2 pb-safe md:hidden">
-                <MobileNavItem icon={LayoutDashboard} label={t('Paneli')} href="/app" isActive={location.pathname === '/app'} />
-                <MobileNavItem icon={Car} label={t('Garazhi')} href="/app#garage-section" isActive={location.hash === '#garage-section' || location.pathname.startsWith('/vehicle') || /\/business\/[^/]+\/vehicle\//.test(location.pathname)} />
+                <MobileNavItem icon={LayoutDashboard} label={workspaceType === 'business' ? 'Overview' : t('Paneli')} href={workspaceHome} isActive={location.pathname === workspaceHome && !location.hash} />
+                <MobileNavItem icon={Car} label={workspaceType === 'business' ? 'Fleet' : t('Garazhi')} href={`${workspaceHome}${workspaceType === 'business' ? '#fleet-register' : '#garage-section'}`} isActive={location.hash === '#fleet-register' || location.hash === '#garage-section' || location.pathname.includes('/vehicles/')} />
                 <button
                     type="button"
                     onClick={handleQuickAdd}
@@ -229,9 +260,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 >
                     <Plus className="h-6 w-6 stroke-[3]" />
                 </button>
-                <MobileNavItem icon={CalendarDays} label={t('Kalendari')} href="/calendar" isActive={location.pathname === '/calendar'} />
-                <MobileNavItem icon={User} label={t('Profili')} href="/profile" isActive={location.pathname === '/profile'} />
+                <MobileNavItem icon={workspaceType === 'business' ? Wrench : CalendarDays} label={workspaceType === 'business' ? 'Work' : t('Kalendari')} href={workspaceType === 'business' ? `${workspaceHome}?view=work` : '/personal/calendar'} isActive={workspaceType === 'business' ? location.search.includes('view=work') : location.pathname === '/personal/calendar'} />
+                <MobileNavItem icon={User} label={t('Account')} href={workspaceType === 'business' ? `/account?workspace=business${organizationId ? `&org=${organizationId}` : ''}` : '/account?workspace=personal'} isActive={location.pathname === '/account'} />
             </nav>
+            <QuickAddSheet />
         </div>
     );
 };

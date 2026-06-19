@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { WorkspaceProvider } from '../context/WorkspaceContext';
 
 const AuthenticatedRouteContent = ({ children, requireUser }: { children: ReactNode; requireUser: boolean }) => {
     const { user } = useAuth();
@@ -10,6 +11,8 @@ const AuthenticatedRouteContent = ({ children, requireUser }: { children: ReactN
 
 export const AuthenticatedRoute = ({ children, requireUser = false }: { children: ReactNode; requireUser?: boolean }) => (
     <AuthProvider>
-        <AuthenticatedRouteContent requireUser={requireUser}>{children}</AuthenticatedRouteContent>
+        <WorkspaceProvider>
+            <AuthenticatedRouteContent requireUser={requireUser}>{children}</AuthenticatedRouteContent>
+        </WorkspaceProvider>
     </AuthProvider>
 );

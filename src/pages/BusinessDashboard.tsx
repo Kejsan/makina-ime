@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     AlertTriangle,
     BarChart3,
@@ -27,12 +27,14 @@ import {
     serverTimestamp,
     setDoc,
     Timestamp,
+    updateDoc,
     where,
 } from 'firebase/firestore';
 import { Layout } from '../components/ui/Layout';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { BusinessOperations } from '../components/BusinessOperations';
 import { AppSurface, EmptyState, MetricCard, PageHeader, Panel, StatusPill } from '../components/ui/design-system';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
@@ -76,6 +78,7 @@ const complianceTone = (state: string) => {
 
 export const BusinessDashboard = () => {
     const { orgId } = useParams<{ orgId: string }>();
+    const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const [organization, setOrganization] = useState<Organization | null>(null);
     const [member, setMember] = useState<OrganizationMember | null>(null);
@@ -90,6 +93,7 @@ export const BusinessDashboard = () => {
     const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
     const [isVendorOpen, setIsVendorOpen] = useState(false);
+    const [editingVendor, setEditingVendor] = useState<BusinessVendor | null>(null);
     const [message, setMessage] = useState('');
     const [vehicleForm, setVehicleForm] = useState({
         make: '',
@@ -118,6 +122,14 @@ export const BusinessDashboard = () => {
         email: '',
         notes: '',
     });
+
+    /* eslint-disable react-hooks/set-state-in-effect -- query parameters intentionally drive modal state */
+    useEffect(() => {
+        const action = searchParams.get('add');
+        if (action === 'vehicle') setIsVehicleModalOpen(true);
+        if (action === 'vendor') setIsVendorOpen(true);
+    }, [searchParams]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     useEffect(() => {
         if (!orgId) return;
@@ -167,7 +179,7 @@ export const BusinessDashboard = () => {
         if (!orgId || !member) return;
         const q = query(collection(db, 'organizations', orgId, 'vendors'));
         return onSnapshot(q, (snapshot) => {
-            setVendors(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as BusinessVendor)));
+            setVendors(snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...snapshotDoc.data() } as BusinessVendor)).filter((vendor) => !vendor.archivedAt));
         }, (error) => {
             console.error('Business vendors listener failed', error);
             setMessage('Vendors could not be loaded. Please check your workspace permissions.');
@@ -332,18 +344,27 @@ export const BusinessDashboard = () => {
         event.preventDefault();
         if (!orgId || !user || !editable) return;
 
-        await addDoc(collection(db, 'organizations', orgId, 'vendors'), {
+        const payload = {
             organizationId: orgId,
             name: vendorForm.name.trim(),
             category: vendorForm.category,
             phone: vendorForm.phone.trim() || null,
             email: vendorForm.email.trim() || null,
             notes: vendorForm.notes.trim() || null,
-            createdAt: serverTimestamp(),
-            createdBy: user.uid,
-        });
+            updatedAt: serverTimestamp(),
+            updatedBy: user.uid,
+        };
+        if (editingVendor) await updateDoc(doc(db, 'organizations', orgId, 'vendors', editingVendor.id), payload);
+        else await addDoc(collection(db, 'organizations', orgId, 'vendors'), { ...payload, createdAt: serverTimestamp(), createdBy: user.uid });
         setVendorForm({ name: '', category: 'workshop', phone: '', email: '', notes: '' });
+        setEditingVendor(null);
         setIsVendorOpen(false);
+    };
+
+    const openVendorEditor = (vendor: BusinessVendor) => {
+        setEditingVendor(vendor);
+        setVendorForm({ name: vendor.name || '', category: vendor.category || 'other', phone: vendor.phone || '', email: vendor.email || '', notes: vendor.notes || '' });
+        setIsVendorOpen(true);
     };
 
     const exportVehiclesCsv = () => {
@@ -485,8 +506,12 @@ export const BusinessDashboard = () => {
                     <MetricCard icon={Users} label="Team" value={members.length.toString()} detail={`Your role: ${member?.role || '-'}`} tone="blue" />
                 </section>
 
+                {(searchParams.get('view') === 'work' || ['driver', 'fuel'].includes(searchParams.get('add') || '')) && (
+                    <BusinessOperations organizationId={orgId!} vehicles={vehicles} canEdit={editable} requestedAction={searchParams.get('add')} />
+                )}
+
                 <div className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
-                    <section className="space-y-4">
+                    <section id="fleet-register" className="scroll-mt-24 space-y-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 className="text-xl font-bold">Fleet register</h2>
@@ -538,7 +563,7 @@ export const BusinessDashboard = () => {
                                                 return (
                                                     <tr key={vehicle.id} className="hover:bg-accent/35">
                                                         <td className="px-5 py-4">
-                                                            <Link to={`/business/${orgId}/vehicle/${vehicle.id}`} className="font-bold hover:text-primary">
+                                                            <Link to={`/business/${orgId}/vehicles/${vehicle.id}`} className="font-bold hover:text-primary">
                                                                 {vehicle.make} {vehicle.model}
                                                             </Link>
                                                             <p className="mt-1 font-mono text-xs text-muted-foreground">{vehicle.plateNumber || 'No plate'} · {vehicle.year}</p>
@@ -596,7 +621,7 @@ export const BusinessDashboard = () => {
                             </div>
                             <div className="mt-4 space-y-2">
                                 {vendors.slice(0, 4).map((vendor) => (
-                                    <Panel key={vendor.id} className="p-3">
+                                    <Panel key={vendor.id} role="button" tabIndex={0} onClick={() => editable && openVendorEditor(vendor)} onKeyDown={(event) => { if (editable && (event.key === 'Enter' || event.key === ' ')) openVendorEditor(vendor); }} className="cursor-pointer p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                         <p className="font-semibold">{vendor.name}</p>
                                         <p className="mt-1 text-xs text-muted-foreground">{vendor.category.replace('_', ' ')}</p>
                                     </Panel>
@@ -673,8 +698,8 @@ export const BusinessDashboard = () => {
             )}
 
             {isVendorOpen && (
-                <Modal onClose={() => setIsVendorOpen(false)} titleId="add-vendor-title" className="max-w-lg">
-                        <h2 id="add-vendor-title" className="mb-5 text-xl font-bold">Add vendor</h2>
+                <Modal onClose={() => { setIsVendorOpen(false); setEditingVendor(null); }} titleId="add-vendor-title" className="max-w-lg">
+                        <h2 id="add-vendor-title" className="mb-5 text-xl font-bold">{editingVendor ? 'Edit vendor' : 'Add vendor'}</h2>
                         <form onSubmit={createVendor} className="space-y-4">
                             <Input label="Vendor name" value={vendorForm.name} onChange={(event) => setVendorForm({ ...vendorForm, name: event.target.value })} required />
                             <div className="space-y-2">

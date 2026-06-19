@@ -768,5 +768,12 @@
   "Enter a valid due date.": "Geben Sie ein gultiges Falligkeitsdatum ein.",
   "Enter a valid expense date.": "Geben Sie ein gultiges Ausgabendatum ein.",
   "Enter a valid expiry date.": "Geben Sie ein gultiges Ablaufdatum ein.",
-  "Enter a valid issue date.": "Geben Sie ein gultiges Ausstellungsdatum ein."
+  "Enter a valid issue date.": "Geben Sie ein gultiges Ausstellungsdatum ein.",
+  "Authentication failed. Check your details and try again.": "Anmeldung fehlgeschlagen. Pruefen Sie Ihre Angaben und versuchen Sie es erneut.",
+  "Run shared vehicles with clear responsibility.": "Verwalten Sie gemeinsame Fahrzeuge mit klarer Verantwortung.",
+  "Keep your own vehicles organized.": "Halten Sie Ihre eigenen Fahrzeuge organisiert.",
+  "Use a team workspace for vehicles, compliance, maintenance, costs, assignments, and work orders.": "Nutzen Sie einen Team-Bereich fur Fahrzeuge, Compliance, Wartung, Kosten, Zuweisungen und Arbeitsauftrage.",
+  "Keep vehicle details, documents, services, reminders, and expenses together without mixing them with business records.": "Halten Sie Fahrzeugdaten, Dokumente, Services, Erinnerungen und Kosten zusammen, ohne sie mit Geschaftsdaten zu vermischen.",
+  "Shared organization fleet": "Gemeinsame Unternehmensflotte",
+  "Inspections and work orders": "Inspektionen und Arbeitsauftrage"
 }

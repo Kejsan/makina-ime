@@ -7,8 +7,8 @@ import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    signIn: (email: string, password: string) => Promise<void>;
-    signUp: (email: string, password: string) => Promise<void>;
+    signIn: (email: string, password: string) => Promise<User>;
+    signUp: (email: string, password: string) => Promise<User>;
     resetPassword: (email: string) => Promise<void>;
     signOut: () => Promise<void>;
 }
@@ -44,11 +44,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const signIn = async (email: string, password: string) => {
         const credential = await signInWithEmailAndPassword(auth, email, password);
         await upsertUserProfile(credential.user);
+        return credential.user;
     };
 
     const signUp = async (email: string, password: string) => {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         await upsertUserProfile(credential.user, true);
+        return credential.user;
     };
 
     const resetPassword = async (email: string) => {

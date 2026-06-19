@@ -15,6 +15,7 @@ const RATE_LIMITS = {
   createUploadUrl: { user: 20, ip: 60 },
   finalizeUpload: { user: 20, ip: 60 },
   createDownloadUrl: { user: 90, ip: 180 },
+  updateDocumentMetadata: { user: 40, ip: 100 },
   deleteDocument: { user: 30, ip: 90 },
   deleteVehicleCascade: { user: 8, ip: 20 },
 };
@@ -525,6 +526,59 @@ const createDownloadUrl = async (uid, body) => {
   };
 };
 
+const updateDocumentMetadata = async (uid, body) => {
+  assertAllowedKeys(body, ['vehicleId', 'documentId', 'name', 'type', 'issueDate', 'expiryDate', 'cost', 'plateNumber', 'vin', 'referenceNumber']);
+  const vehicleId = requireSafeId(body, 'vehicleId');
+  const documentId = requireSafeId(body, 'documentId');
+  const name = requireSafeString(body, 'name', 180);
+  const type = requireDocumentType(body);
+  const issueDate = optionalDateInput(body, 'issueDate');
+  const expiryDate = optionalDateInput(body, 'expiryDate');
+  const cost = requireNumber(body, 'cost');
+  const plateNumber = optionalSafeMetadataString(body, 'plateNumber', 15)?.toUpperCase() || null;
+  const vin = optionalSafeMetadataString(body, 'vin', 17)?.toUpperCase() || null;
+  const referenceNumber = optionalSafeMetadataString(body, 'referenceNumber', 80);
+  if (cost < 0 || cost > 1000000000 || Math.round(cost * 100) !== cost * 100) throw Object.assign(new Error('Invalid cost'), { statusCode: 400 });
+  if (plateNumber && !PLATE.test(plateNumber)) throw Object.assign(new Error('Invalid plateNumber'), { statusCode: 400 });
+  if (vin && !VIN.test(vin)) throw Object.assign(new Error('Invalid vin'), { statusCode: 400 });
+
+  const { db, vehicle, member } = await requireAccessibleVehicle(uid, vehicleId, 'driver');
+  const documentRef = db.collection('vehicles').doc(vehicleId).collection('documents').doc(documentId);
+  const documentSnap = await documentRef.get();
+  if (!documentSnap.exists) throw Object.assign(new Error('Document not found'), { statusCode: 404 });
+  const existing = documentSnap.data();
+  if (vehicle?.ownerType !== 'organization' && existing?.userId && existing.userId !== uid) throw Object.assign(new Error('Document not found'), { statusCode: 404 });
+  if (vehicle?.ownerType === 'organization' && ROLE_RANK[member?.role] < ROLE_RANK.manager && existing?.createdBy !== uid) {
+    throw Object.assign(new Error('You can only edit documents you created'), { statusCode: 403 });
+  }
+
+  const batch = db.batch();
+  batch.update(documentRef, {
+    name,
+    type,
+    issueDate,
+    expiryDate,
+    cost,
+    plateNumber,
+    vin,
+    referenceNumber,
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: uid,
+  });
+  if (existing?.expenseId) {
+    batch.update(db.collection('vehicles').doc(vehicleId).collection('expenses').doc(existing.expenseId), {
+      category: type === 'insurance' ? 'Insurance' : type === 'tax' ? 'Tax' : type === 'service' ? 'Maintenance' : 'Document',
+      amount: cost,
+      notes: `Document: ${name}`,
+      sourceLabel: name,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: uid,
+    });
+  }
+  await batch.commit();
+  return { updated: true };
+};
+
 const deleteDocument = async (uid, body) => {
   assertAllowedKeys(body, ['vehicleId', 'documentId']);
   const vehicleId = requireSafeId(body, 'vehicleId');
@@ -542,18 +596,19 @@ const deleteDocument = async (uid, body) => {
     throw Object.assign(new Error('Document not found'), { statusCode: 404 });
   }
 
-  if (data?.path) {
-    await deleteR2Object(data.path);
-  }
-
   const batch = db.batch();
-  batch.delete(documentRef);
-  if (data?.expenseId) {
-    batch.delete(db.collection('vehicles').doc(vehicleId).collection('expenses').doc(data.expenseId));
+  if (vehicle?.ownerType === 'organization') {
+    const archive = { archivedAt: FieldValue.serverTimestamp(), archivedBy: uid, updatedAt: FieldValue.serverTimestamp(), updatedBy: uid };
+    batch.update(documentRef, archive);
+    if (data?.expenseId) batch.update(db.collection('vehicles').doc(vehicleId).collection('expenses').doc(data.expenseId), archive);
+  } else {
+    if (data?.path) await deleteR2Object(data.path);
+    batch.delete(documentRef);
+    if (data?.expenseId) batch.delete(db.collection('vehicles').doc(vehicleId).collection('expenses').doc(data.expenseId));
   }
   await batch.commit();
 
-  return { deleted: true };
+  return { deleted: vehicle?.ownerType !== 'organization', archived: vehicle?.ownerType === 'organization' };
 };
 
 const deleteVehicleCascade = async (uid, body) => {
@@ -615,6 +670,7 @@ const handlers = {
   createUploadUrl,
   finalizeUpload,
   createDownloadUrl,
+  updateDocumentMetadata,
   deleteDocument,
   deleteVehicleCascade,
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, Timestamp, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, Timestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/Button';
@@ -9,9 +9,13 @@ import { DollarSign, Calendar, Trash2, Plus, Tag, Pencil } from 'lucide-react';
 import type { ExpenseRecord } from '../lib/types';
 import { expenseAmount, sumExpenses } from '../lib/expenses';
 import { isValidDateInput, parseMoney } from '../lib/validation';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { DetailRows, RecordDetailsSheet, useRecordDetails } from './RecordDetailsSheet';
 
-export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: string; quickAddToken?: number }) => {
+export const ExpenseTracker = ({ vehicleId, quickAddToken = 0, organizationId, canEditAll = true }: { vehicleId: string; quickAddToken?: number; organizationId?: string; canEditAll?: boolean }) => {
     const { user } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
@@ -29,7 +33,18 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
 
     const categories = ['Fuel', 'Insurance', 'Tax', 'Parking', 'Tolls', 'Cleaning', 'Maintenance', 'Document', 'Other'];
 
-    const canEditExpense = (expense: ExpenseRecord) => !expense.sourceType || expense.sourceType === 'manual' || expense.sourceType === 'service';
+    const canEditExpense = (expense: ExpenseRecord) => (!expense.sourceType || expense.sourceType === 'manual') && (canEditAll || expense.userId === user?.uid || expense.createdBy === user?.uid);
+    const { selectedId, openRecord, closeRecord } = useRecordDetails('expense');
+    const selectedExpense = expenses.find((expense) => expense.id === selectedId) || null;
+
+    const openSource = (expense: ExpenseRecord) => {
+        if (!expense.sourceType || expense.sourceType === 'manual' || !expense.sourceId) return;
+        const params = new URLSearchParams();
+        params.set('section', expense.sourceType === 'service' ? 'services' : 'documents');
+        params.set('recordType', expense.sourceType);
+        params.set('record', expense.sourceId);
+        navigate(`${location.pathname}?${params.toString()}`);
+    };
 
     const formatDateInput = (expenseDate?: Timestamp) => {
         const dateValue = expenseDate?.toDate?.();
@@ -85,7 +100,7 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
             orderBy('date', 'desc')
         );
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setExpenses(snapshot.docs.map(snapshotDoc => ({ id: snapshotDoc.id, vehicleId, ...snapshotDoc.data() } as ExpenseRecord)));
+            setExpenses(snapshot.docs.map(snapshotDoc => ({ id: snapshotDoc.id, vehicleId, ...snapshotDoc.data() } as ExpenseRecord)).filter((expense) => !expense.archivedAt));
             setLoading(false);
             setLoadError('');
         }, (error) => {
@@ -127,28 +142,16 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                     return;
                 }
 
-                if (editingExpense.sourceType === 'service' && editingExpense.sourceId) {
-                    const batch = writeBatch(db);
-                    batch.update(doc(db, 'vehicles', vehicleId, 'expenses', editingExpense.id), {
-                        ...payload,
-                        sourceLabel: notes.trim().replace(/^Service:\s*/i, '') || editingExpense.sourceLabel || 'Service',
-                        updatedAt: Timestamp.now(),
-                    });
-                    batch.update(doc(db, 'vehicles', vehicleId, 'services', editingExpense.sourceId), {
-                        cost: parsedAmount,
-                        date: payload.date,
-                        updatedAt: Timestamp.now(),
-                    });
-                    await batch.commit();
-                } else {
-                    await updateDoc(doc(db, 'vehicles', vehicleId, 'expenses', editingExpense.id), {
-                        ...payload,
-                        updatedAt: Timestamp.now(),
-                    });
-                }
+                await updateDoc(doc(db, 'vehicles', vehicleId, 'expenses', editingExpense.id), {
+                    ...payload,
+                    updatedAt: Timestamp.now(),
+                    updatedBy: user.uid,
+                });
             } else {
                 await addDoc(collection(db, 'vehicles', vehicleId, 'expenses'), {
                     userId: user.uid,
+                    organizationId: organizationId || null,
+                    createdBy: user.uid,
                     vehicleId,
                     ...payload,
                     sourceType: 'manual',
@@ -163,8 +166,9 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
     };
 
     const handleDelete = async (id: string) => {
-        if (confirm('Delete this expense?')) {
-            await deleteDoc(doc(db, 'vehicles', vehicleId, 'expenses', id));
+        if (confirm(organizationId ? 'Archive this expense?' : 'Delete this expense?')) {
+            if (organizationId) await updateDoc(doc(db, 'vehicles', vehicleId, 'expenses', id), { archivedAt: Timestamp.now(), archivedBy: user?.uid || null, updatedAt: Timestamp.now(), updatedBy: user?.uid || null });
+            else await deleteDoc(doc(db, 'vehicles', vehicleId, 'expenses', id));
         }
     };
 
@@ -282,7 +286,7 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                     </div>
                 ) : (
                     expenses.map(expense => (
-                        <Card key={expense.id} className="group p-4 transition-colors duration-300 hover:border-primary/30">
+                        <Card key={expense.id} role="button" tabIndex={0} onClick={() => openRecord(expense.id)} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) { event.preventDefault(); openRecord(expense.id); } }} className="group cursor-pointer p-4 transition-colors duration-300 hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex min-w-0 items-center gap-4">
                                     <div className="p-2.5 bg-surface rounded-xl border border-border">
@@ -312,7 +316,7 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                                     <span className="font-bold text-lg font-mono">€{expenseAmount(expense).toFixed(2)}</span>
                                     {canEditExpense(expense) && (
                                         <button
-                                            onClick={() => openEditForm(expense)}
+                                            onClick={(event) => { event.stopPropagation(); openEditForm(expense); }}
                                             className="text-muted-foreground hover:text-primary transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-primary/10 rounded-lg"
                                             title="Edit Expense"
                                         >
@@ -320,7 +324,7 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                                         </button>
                                     )}
                                     <button 
-                                        onClick={() => handleDeleteClick(expense)} 
+                                        onClick={(event) => { event.stopPropagation(); void handleDeleteClick(expense); }}
                                         className="text-muted-foreground hover:text-destructive transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"
                                         title="Delete Expense"
                                     >
@@ -332,6 +336,28 @@ export const ExpenseTracker = ({ vehicleId, quickAddToken = 0 }: { vehicleId: st
                     ))
                 )}
             </div>
+            {selectedExpense && (
+                <RecordDetailsSheet
+                    eyebrow={selectedExpense.sourceType && selectedExpense.sourceType !== 'manual' ? `Linked ${selectedExpense.sourceType} expense` : 'Expense record'}
+                    title={selectedExpense.category}
+                    onClose={closeRecord}
+                    canEdit={canEditExpense(selectedExpense)}
+                    onEdit={canEditExpense(selectedExpense) ? () => { openEditForm(selectedExpense); closeRecord(); } : () => openSource(selectedExpense)}
+                    onDelete={canEditExpense(selectedExpense) ? () => { closeRecord(); void handleDeleteClick(selectedExpense); } : undefined}
+                    deleteLabel={organizationId ? 'Archive' : 'Delete'}
+                >
+                    <DetailRows rows={[
+                        ['Amount', `€${expenseAmount(selectedExpense).toFixed(2)}`],
+                        ['Date', selectedExpense.date?.toDate?.().toLocaleDateString()],
+                        ['Notes', selectedExpense.notes],
+                        ['Source', selectedExpense.sourceType && selectedExpense.sourceType !== 'manual' ? `${selectedExpense.sourceType}: ${selectedExpense.sourceLabel || selectedExpense.sourceId}` : 'Manual expense'],
+                        ['Last updated', selectedExpense.updatedAt?.toDate?.().toLocaleString()],
+                    ]} />
+                    {selectedExpense.sourceType && selectedExpense.sourceType !== 'manual' && (
+                        <Button variant="outline" className="mt-4 w-full" onClick={() => openSource(selectedExpense)}>Open source record</Button>
+                    )}
+                </RecordDetailsSheet>
+            )}
         </div>
     );
 };

@@ -4,6 +4,7 @@ type R2DocumentAction =
     | 'createUploadUrl'
     | 'finalizeUpload'
     | 'createDownloadUrl'
+    | 'updateDocumentMetadata'
     | 'deleteDocument'
     | 'deleteVehicleCascade';
 

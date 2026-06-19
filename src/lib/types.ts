@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 export type WorkspaceOwnerType = 'personal' | 'organization';
+export type WorkspaceType = 'personal' | 'business';
 export type OrganizationRole = 'owner' | 'admin' | 'manager' | 'driver' | 'viewer';
 export type OrganizationMemberStatus = 'active' | 'invited' | 'suspended';
 export type BusinessVehicleStatus = 'active' | 'in_service' | 'needs_attention' | 'out_of_service' | 'reserved' | 'sold' | 'archived';
@@ -9,6 +10,67 @@ export type WorkOrderPriority = 'low' | 'medium' | 'high' | 'critical';
 export type MaintenanceRuleCategory = 'oil' | 'tires' | 'brakes' | 'filters' | 'fluids' | 'timing_belt';
 export type MaintenanceInsightStatus = 'ok' | 'due_soon' | 'overdue' | 'setup_needed';
 export type MaintenanceInsightBasis = 'mileage' | 'date' | 'mileage_and_date' | 'service_history';
+
+export interface WorkspaceCapabilities {
+    canView: boolean;
+    canCreateOperationalRecords: boolean;
+    canEditOwnRecords: boolean;
+    canEditAllRecords: boolean;
+    canManageMembers: boolean;
+    canManageOrganization: boolean;
+}
+
+export type QuickAddActionId =
+    | 'vehicle'
+    | 'expense'
+    | 'fuel'
+    | 'service'
+    | 'document'
+    | 'reminder'
+    | 'mileage'
+    | 'inspection'
+    | 'issue'
+    | 'workOrder'
+    | 'driver'
+    | 'vendor';
+
+export interface QuickAddAction {
+    id: QuickAddActionId;
+    label: string;
+    group: 'vehicle' | 'maintenance' | 'business';
+    requiresVehicle: boolean;
+    minimumCapability: keyof WorkspaceCapabilities;
+}
+
+export interface RecordDetailDescriptor {
+    recordType: string;
+    recordId: string;
+    vehicleId?: string;
+    organizationId?: string;
+}
+
+export interface AuditableRecord {
+    createdAt?: Timestamp;
+    createdBy?: string;
+    updatedAt?: Timestamp;
+    updatedBy?: string;
+    archivedAt?: Timestamp | null;
+    archivedBy?: string | null;
+}
+
+export interface AuditEvent {
+    id: string;
+    organizationId: string;
+    actorId: string;
+    action: 'create' | 'update' | 'archive' | 'restore' | 'delete';
+    recordType: string;
+    recordId: string;
+    vehicleId?: string | null;
+    changedFields: string[];
+    before?: Record<string, unknown>;
+    after?: Record<string, unknown>;
+    createdAt: Timestamp;
+}
 
 export interface VehicleMaintenanceProfile {
     severeUsage?: boolean;
@@ -40,7 +102,7 @@ export interface MaintenanceInsight {
     confidence: 'default' | 'service_history' | 'user_configured';
 }
 
-export interface Vehicle {
+export interface Vehicle extends AuditableRecord {
     id: string;
     make: string;
     model: string;
@@ -74,7 +136,7 @@ export interface Vehicle {
     updatedBy?: string;
 }
 
-export interface ServiceRecord {
+export interface ServiceRecord extends AuditableRecord {
     id: string;
     date: Timestamp;
     description: string;
@@ -87,7 +149,7 @@ export interface ServiceRecord {
     createdBy?: string;
 }
 
-export interface ExpenseRecord {
+export interface ExpenseRecord extends AuditableRecord {
     id: string;
     category: string; // 'fuel' | 'insurance' | 'tax' | 'maintenance' | 'other'
     amount: number;
@@ -95,14 +157,14 @@ export interface ExpenseRecord {
     notes?: string;
     vehicleId: string;
     userId?: string;
-    sourceType?: 'manual' | 'service' | 'document';
+    sourceType?: 'manual' | 'service' | 'document' | 'fuel';
     sourceId?: string;
     sourceLabel?: string;
     organizationId?: string;
     createdBy?: string;
 }
 
-export interface Document {
+export interface Document extends AuditableRecord {
     id: string;
     name: string;
     url?: string;
@@ -118,6 +180,8 @@ export interface Document {
     cost?: number;
     expenseId?: string;
     userId?: string;
+    ownerType?: WorkspaceOwnerType;
+    ownerId?: string;
     plateNumber?: string | null;
     vin?: string | null;
     referenceNumber?: string | null;
@@ -126,7 +190,7 @@ export interface Document {
     createdBy?: string;
 }
 
-export interface Reminder {
+export interface Reminder extends AuditableRecord {
     id: string;
     userId: string;
     vehicleId: string;
@@ -149,6 +213,8 @@ export interface UserPreferences {
     defaultReminderLeadTimeDays: number;
     browserNotificationsEnabled: boolean;
     emailReminderEnabled: boolean;
+    lastWorkspaceType?: WorkspaceType;
+    lastOrganizationId?: string | null;
     updatedAt?: Timestamp;
 }
 
@@ -208,7 +274,7 @@ export interface InspectionItem {
     notes?: string;
 }
 
-export interface VehicleInspection {
+export interface VehicleInspection extends AuditableRecord {
     id: string;
     vehicleId: string;
     organizationId: string;
@@ -224,7 +290,7 @@ export interface VehicleInspection {
     createdAt: Timestamp;
 }
 
-export interface VehicleIssue {
+export interface VehicleIssue extends AuditableRecord {
     id: string;
     vehicleId: string;
     organizationId: string;
@@ -239,7 +305,7 @@ export interface VehicleIssue {
     resolvedAt?: Timestamp;
 }
 
-export interface WorkOrder {
+export interface WorkOrder extends AuditableRecord {
     id: string;
     vehicleId: string;
     organizationId: string;
@@ -262,7 +328,7 @@ export interface WorkOrder {
     updatedBy?: string;
 }
 
-export interface BusinessVendor {
+export interface BusinessVendor extends AuditableRecord {
     id: string;
     organizationId: string;
     name: string;
@@ -273,4 +339,65 @@ export interface BusinessVendor {
     notes?: string;
     createdAt: Timestamp;
     createdBy: string;
+    updatedAt?: Timestamp;
+    updatedBy?: string;
+    archivedAt?: Timestamp | null;
+    archivedBy?: string | null;
+}
+
+export interface OrganizationDriver extends AuditableRecord {
+    id: string;
+    organizationId: string;
+    displayName: string;
+    employeeId?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    department?: string | null;
+    linkedUserId?: string | null;
+    status: 'active' | 'inactive';
+}
+
+export interface OdometerLog extends AuditableRecord {
+    id: string;
+    organizationId?: string | null;
+    vehicleId: string;
+    mileage: number;
+    recordedAt: Timestamp;
+    sourceType: 'manual' | 'service' | 'fuel' | 'inspection';
+    sourceId?: string | null;
+    notes?: string | null;
+}
+
+export interface FuelLog extends AuditableRecord {
+    id: string;
+    organizationId: string;
+    vehicleId: string;
+    date: Timestamp;
+    quantity: number;
+    unitPrice: number;
+    totalCost: number;
+    mileage: number;
+    fuelType?: string | null;
+    vendorId?: string | null;
+    expenseId?: string | null;
+    notes?: string | null;
+}
+
+export interface MaintenanceProgram extends AuditableRecord {
+    id: string;
+    organizationId: string;
+    name: string;
+    vehicleIds: string[];
+    intervalKm?: number | null;
+    intervalMonths?: number | null;
+    active: boolean;
+}
+
+export interface InspectionTemplate extends AuditableRecord {
+    id: string;
+    organizationId: string;
+    name: string;
+    items: Array<{ id: string; label: string; required: boolean }>;
+    recurrenceDays?: number | null;
+    active: boolean;
 }

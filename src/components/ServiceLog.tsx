@@ -9,15 +9,20 @@ import { Wrench, Calendar, Trash2, Plus, Gauge, Pencil } from 'lucide-react';
 import type { ServiceRecord } from '../lib/types';
 import { moneyValue } from '../lib/expenses';
 import { isValidDateInput, parseInteger, parseMoney, VEHICLE_LIMITS } from '../lib/validation';
+import { DetailRows, RecordDetailsSheet, useRecordDetails } from './RecordDetailsSheet';
 
 export const ServiceLog = ({
     vehicleId,
     quickAddToken = 0,
     vehicleCurrentMileage = 0,
+    organizationId,
+    canEditAll = true,
 }: {
     vehicleId: string;
     quickAddToken?: number;
     vehicleCurrentMileage?: number;
+    organizationId?: string;
+    canEditAll?: boolean;
 }) => {
     const { user } = useAuth();
     const [services, setServices] = useState<ServiceRecord[]>([]);
@@ -33,6 +38,8 @@ export const ServiceLog = ({
     const [cost, setCost] = useState('');
     const [mileage, setMileage] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const { selectedId, openRecord, closeRecord } = useRecordDetails('service');
+    const selectedService = services.find((service) => service.id === selectedId) || null;
 
     const resetForm = () => {
         setEditingService(null);
@@ -81,7 +88,7 @@ export const ServiceLog = ({
             orderBy('date', 'desc')
         );
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceRecord)));
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceRecord)).filter((service) => !service.archivedAt));
             setLoadError('');
             setLoading(false);
         }, (error) => {
@@ -125,6 +132,7 @@ export const ServiceLog = ({
             const batch = writeBatch(db);
             const servicePayload = {
                 userId: editingService?.userId || user.uid,
+                organizationId: organizationId || null,
                 vehicleId,
                 description: description.trim(),
                 date: serviceDate,
@@ -132,6 +140,7 @@ export const ServiceLog = ({
                 mileage: serviceMileage,
                 expenseId: editingService?.expenseId || expenseRef.id,
                 updatedAt: Timestamp.now(),
+                updatedBy: user.uid,
             };
 
             if (editingService) {
@@ -139,12 +148,15 @@ export const ServiceLog = ({
             } else {
                 batch.set(serviceRef, {
                     ...servicePayload,
+                    createdBy: user.uid,
                     createdAt: Timestamp.now()
                 });
             }
 
             const expenseCreatePayload = {
                 userId: user.uid,
+                organizationId: organizationId || null,
+                createdBy: user.uid,
                 vehicleId,
                 category: 'Maintenance',
                 amount: serviceCost,
@@ -161,6 +173,7 @@ export const ServiceLog = ({
                 notes: `Service: ${description.trim()}`,
                 sourceLabel: description.trim(),
                 updatedAt: Timestamp.now(),
+                updatedBy: user.uid,
             };
 
             if (shouldCreateLinkedExpense) {
@@ -189,11 +202,15 @@ export const ServiceLog = ({
     };
 
      const handleDelete = async (service: ServiceRecord) => {
-        if (confirm('Delete this service record?')) {
+        if (confirm(organizationId ? 'Archive this service record?' : 'Delete this service record?')) {
             const batch = writeBatch(db);
-            batch.delete(doc(db, 'vehicles', vehicleId, 'services', service.id));
-            if (service.expenseId) {
-                batch.delete(doc(db, 'vehicles', vehicleId, 'expenses', service.expenseId));
+            if (organizationId) {
+                const archive = { archivedAt: Timestamp.now(), archivedBy: user?.uid || null, updatedAt: Timestamp.now(), updatedBy: user?.uid || null };
+                batch.update(doc(db, 'vehicles', vehicleId, 'services', service.id), archive);
+                if (service.expenseId) batch.update(doc(db, 'vehicles', vehicleId, 'expenses', service.expenseId), archive);
+            } else {
+                batch.delete(doc(db, 'vehicles', vehicleId, 'services', service.id));
+                if (service.expenseId) batch.delete(doc(db, 'vehicles', vehicleId, 'expenses', service.expenseId));
             }
             await batch.commit();
         }
@@ -284,7 +301,7 @@ export const ServiceLog = ({
                     </div>
                 ) : (
                     services.map(service => (
-                        <Card key={service.id} className="group p-5 transition-colors duration-300 hover:border-primary/30">
+                        <Card key={service.id} role="button" tabIndex={0} onClick={() => openRecord(service.id)} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) { event.preventDefault(); openRecord(service.id); } }} className="group cursor-pointer p-5 transition-colors duration-300 hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex min-w-0 items-start gap-4">
                                     <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">
@@ -306,26 +323,45 @@ export const ServiceLog = ({
                                 </div>
                                 <div className="flex shrink-0 items-center justify-end gap-3">
                                     <span className="font-bold text-xl font-mono">€{moneyValue(service.cost).toFixed(2)}</span>
-                                    <button
-                                        onClick={() => openEditForm(service)}
+                                    {(canEditAll || service.userId === user?.uid || service.createdBy === user?.uid) && <button
+                                        onClick={(event) => { event.stopPropagation(); openEditForm(service); }}
                                         className="text-muted-foreground hover:text-primary transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-primary/10 rounded-lg"
                                         title="Edit Record"
                                     >
                                         <Pencil className="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(service)} 
+                                    </button>}
+                                    {(canEditAll || service.userId === user?.uid || service.createdBy === user?.uid) && <button
+                                        onClick={(event) => { event.stopPropagation(); void handleDelete(service); }}
                                         className="text-muted-foreground hover:text-destructive transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 hover:bg-destructive/10 rounded-lg"
                                         title="Delete Record"
                                     >
                                         <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    </button>}
                                 </div>
                             </div>
                         </Card>
                     ))
                 )}
             </div>
+            {selectedService && (
+                <RecordDetailsSheet
+                    eyebrow="Service record"
+                    title={selectedService.description}
+                    onClose={closeRecord}
+                    canEdit={canEditAll || selectedService.userId === user?.uid || selectedService.createdBy === user?.uid}
+                    onEdit={() => { openEditForm(selectedService); closeRecord(); }}
+                    onDelete={canEditAll || selectedService.userId === user?.uid || selectedService.createdBy === user?.uid ? () => { closeRecord(); void handleDelete(selectedService); } : undefined}
+                    deleteLabel={organizationId ? 'Archive' : 'Delete'}
+                >
+                    <DetailRows rows={[
+                        ['Date', selectedService.date?.toDate?.().toLocaleDateString()],
+                        ['Mileage', `${selectedService.mileage.toLocaleString()} km`],
+                        ['Cost', `€${moneyValue(selectedService.cost).toFixed(2)}`],
+                        ['Linked expense', selectedService.expenseId || 'Created automatically'],
+                        ['Last updated', selectedService.updatedAt?.toDate?.().toLocaleString()],
+                    ]} />
+                </RecordDetailsSheet>
+            )}
         </div>
     );
 };

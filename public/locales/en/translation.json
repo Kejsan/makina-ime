@@ -1041,5 +1041,12 @@
   "Enter a valid due date.": "Enter a valid due date.",
   "Enter a valid expense date.": "Enter a valid expense date.",
   "Enter a valid expiry date.": "Enter a valid expiry date.",
-  "Enter a valid issue date.": "Enter a valid issue date."
+  "Enter a valid issue date.": "Enter a valid issue date.",
+  "Authentication failed. Check your details and try again.": "Authentication failed. Check your details and try again.",
+  "Run shared vehicles with clear responsibility.": "Run shared vehicles with clear responsibility.",
+  "Keep your own vehicles organized.": "Keep your own vehicles organized.",
+  "Use a team workspace for vehicles, compliance, maintenance, costs, assignments, and work orders.": "Use a team workspace for vehicles, compliance, maintenance, costs, assignments, and work orders.",
+  "Keep vehicle details, documents, services, reminders, and expenses together without mixing them with business records.": "Keep vehicle details, documents, services, reminders, and expenses together without mixing them with business records.",
+  "Shared organization fleet": "Shared organization fleet",
+  "Inspections and work orders": "Inspections and work orders"
 }

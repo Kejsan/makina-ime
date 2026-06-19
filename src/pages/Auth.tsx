@@ -1,299 +1,168 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Building2, Car, Eye, EyeOff, Lock, Mail, ShieldCheck, Users } from 'lucide-react';
+import { Building2, Car, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import type { User } from 'firebase/auth';
 import { Button } from '../components/ui/Button';
-import { AppSurface, Panel, StatusPill, ThemeToggle } from '../components/ui/design-system';
+import { AppSurface, Panel, ThemeToggle } from '../components/ui/design-system';
 import { PwaInstallButton } from '../components/PwaInstallButton';
 import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../components/DevelopmentNotice';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../lib/firebase';
 import { Seo } from '../lib/seo';
 import logo from '../assets/Makina Ime Logo.webp';
+
+type AccountType = 'personal' | 'business';
 
 export const Auth = () => {
     const { t } = useTranslation();
     const { signIn, signUp, resetPassword } = useAuth();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-
-    const initialType = searchParams.get('type') === 'business' ? 'business' : 'personal';
-    const initialMode = searchParams.get('mode') === 'signup' ? false : true;
-    const [accountType, setAccountType] = useState<'personal' | 'business'>(initialType);
-    const [isLogin, setIsLogin] = useState(initialMode);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
+    const initialType: AccountType = searchParams.get('type') === 'business' ? 'business' : 'personal';
+    const [accountType, setAccountType] = useState<AccountType>(initialType);
+    const [typeExplicit, setTypeExplicit] = useState(searchParams.has('type'));
+    const [isLogin, setIsLogin] = useState(searchParams.get('mode') !== 'signup');
+    const [isResetMode, setIsResetMode] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [isResetMode, setIsResetMode] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const updateUrl = (type: AccountType, login = isLogin) => setSearchParams({ type, mode: login ? 'signin' : 'signup' });
+
+    const selectType = (type: AccountType) => {
+        setAccountType(type);
+        setTypeExplicit(true);
+        updateUrl(type);
+    };
+
+    const toggleMode = () => {
+        const next = !isLogin;
+        setIsLogin(next);
+        setIsResetMode(false);
         setError('');
         setMessage('');
-        setLoading(true);
+        updateUrl(accountType, next);
+    };
 
+    const destinationFor = async (authenticatedUser: User) => {
+        if (typeExplicit || !isLogin) return accountType === 'business' ? '/business' : '/personal';
+        const profile = await getDoc(doc(db, 'users', authenticatedUser.uid));
+        const lastType = profile.data()?.lastWorkspaceType;
+        const lastOrganizationId = profile.data()?.lastOrganizationId;
+        if (lastType === 'business' && typeof lastOrganizationId === 'string') {
+            const membership = await getDoc(doc(db, 'organizationMembers', `${lastOrganizationId}_${authenticatedUser.uid}`));
+            if (membership.exists() && membership.data().status === 'active') return `/business/${lastOrganizationId}`;
+        }
+        return '/personal';
+    };
+
+    const handleSubmit = async (event: FormEvent) => {
+        event.preventDefault();
+        setLoading(true);
+        setError('');
+        setMessage('');
         try {
             const normalizedEmail = email.trim().toLowerCase();
-            if (isLogin) {
-                await signIn(normalizedEmail, password);
-            } else {
-                await signUp(normalizedEmail, password);
-            }
-            navigate(accountType === 'business' ? '/business' : '/app');
-        } catch (err: unknown) {
-            console.error('Authentication failed');
-            setError(err instanceof Error && err.message.includes('auth/')
-                ? t('Sign-in failed. Check your email and password, then try again.')
-                : t('Authentication failed. Please try again.'));
+            const authenticatedUser = isLogin
+                ? await signIn(normalizedEmail, password)
+                : await signUp(normalizedEmail, password);
+            navigate(await destinationFor(authenticatedUser), { replace: true });
+        } catch {
+            setError(t('Authentication failed. Check your details and try again.'));
         } finally {
             setLoading(false);
         }
     };
 
-    const handlePasswordReset = async (event: React.FormEvent) => {
+    const handleReset = async (event: FormEvent) => {
         event.preventDefault();
-        setError('');
-        setMessage('');
         setLoading(true);
-
+        setError('');
         try {
             await resetPassword(email.trim().toLowerCase());
             setMessage(t('Password reset email sent. Check your inbox and spam folder.'));
             setIsResetMode(false);
-        } catch (err: unknown) {
-            console.error('Password reset failed');
-            setError(err instanceof Error && err.message.includes('auth/')
-                ? t('Could not send a reset email. Check the email address and try again.')
-                : t('Password reset failed. Please try again.'));
+        } catch {
+            setError(t('Could not send a reset email. Check the email address and try again.'));
         } finally {
             setLoading(false);
         }
     };
 
-    const setFlow = (nextType: 'personal' | 'business') => {
-        setAccountType(nextType);
-        setSearchParams({ type: nextType, mode: isLogin ? 'signin' : 'signup' });
-    };
-
-    const toggleMode = () => {
-        const nextIsLogin = !isLogin;
-        setIsLogin(nextIsLogin);
-        setIsResetMode(false);
-        setError('');
-        setMessage('');
-        setSearchParams({ type: accountType, mode: nextIsLogin ? 'signin' : 'signup' });
-    };
-
-    const flowCopy = accountType === 'business'
-        ? {
-            eyebrow: t('Business fleet workspace'),
-            title: isLogin ? t('Access your fleet') : t('Create your business login'),
-            body: t('Use this path for company cars, taxi fleets, rental fleets, service vehicles, and car sellers. After registration, create or join an organization workspace.'),
-            formTitle: isLogin ? t('Sign in to business') : t('Start business setup'),
-            cta: isLogin ? t('Sign In') : t('Create Business Account'),
-            panels: [
-                { label: t('Organization roles'), icon: Users },
-                { label: t('Fleet records'), icon: Building2 },
-                { label: t('Inspections and reports'), icon: ShieldCheck },
-            ],
-        }
-        : {
-            eyebrow: t('Private garage workspace'),
-            title: isLogin ? t('Welcome back') : t('Create your personal garage'),
-            body: t('Use this path for your own vehicles. Store documents, track services and costs, and get reminders for renewals and maintenance.'),
-            formTitle: isLogin ? t('Access your dashboard') : t('Start tracking your vehicles'),
-            cta: isLogin ? t('Sign In') : t('Create Personal Account'),
-            panels: [
-                { label: t('Vehicle records'), icon: Car },
-                { label: t('Private documents'), icon: Lock },
-                { label: t('Reminder alerts'), icon: ShieldCheck },
-            ],
-        };
+    const business = accountType === 'business';
+    const benefits = business
+        ? ['Shared organization fleet', 'Roles and team access', 'Inspections and work orders']
+        : ['Private vehicle records', 'Documents and renewal dates', 'Services, reminders, and costs'];
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <Seo
-                title="Sign in or create an account | Makina Ime"
-                description="Sign in to Makina Ime or create a currently free personal vehicle garage or business fleet workspace account during active development."
-                path="/auth"
-                robots="noindex,follow"
-            />
-            <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-                <Link to="/" className="flex items-center gap-3">
-                    <img src={logo} alt="Makina Ime" width="658" height="658" className="h-10 w-auto" />
+        <div className={`min-h-screen text-foreground ${business ? 'bg-indigo-950/10' : 'bg-emerald-950/10'}`}>
+            <Seo title="Sign in or create an account | Makina Ime" description="Access your Makina Ime personal garage or business fleet workspace." path="/auth" robots="noindex,follow" />
+            <header className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16">
+                <Link to={business ? '/business-fleet' : '/'} className="flex items-center gap-2">
+                    <img src={logo} alt="Makina Ime" width="658" height="658" className="h-9 w-auto" />
+                    <span className="hidden text-sm font-extrabold sm:inline">Makina Ime</span>
                 </Link>
-                <div className="flex items-center gap-2">
-                    <PwaInstallButton compact />
-                    <ThemeToggle />
-                </div>
+                <div className="flex items-center gap-2"><PwaInstallButton compact /><ThemeToggle /></div>
             </header>
 
-            <main className="mx-auto grid max-w-6xl gap-8 px-4 py-8 lg:grid-cols-[0.85fr_1fr] lg:items-center lg:py-14">
-                <section className="space-y-6">
-                    <StatusPill tone="amber">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        {flowCopy.eyebrow}
-                    </StatusPill>
-                    <div className="space-y-4">
-                        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-                            {flowCopy.title}
-                        </h1>
-                        <p className="max-w-xl text-sm leading-7 text-muted-foreground">
-                            {flowCopy.body}
-                        </p>
-                    </div>
-                    <DevelopmentDisclaimer compact />
-                    <div className="grid gap-2 rounded-2xl border border-border bg-card/60 p-1 sm:grid-cols-2">
+            <main className="mx-auto grid max-w-6xl gap-6 px-4 pb-10 pt-2 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start lg:py-10">
+                <AppSurface className={`order-1 p-4 sm:p-6 lg:col-start-2 ${business ? 'border-indigo-500/30' : 'border-emerald-500/30'}`}>
+                    <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-background/60 p-1" aria-label="Workspace type">
                         {(['personal', 'business'] as const).map((type) => (
-                            <button
-                                key={type}
-                                type="button"
-                                onClick={() => setFlow(type)}
-                                className={`rounded-xl px-4 py-3 text-sm font-bold transition-colors ${
-                                    accountType === type
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                                }`}
-                            >
-                                {type === 'personal' ? t('Personal') : t('Business')}
+                            <button key={type} type="button" onClick={() => selectType(type)} className={`flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold ${accountType === type ? type === 'business' ? 'bg-indigo-500 text-white' : 'bg-emerald-500 text-white' : 'text-muted-foreground hover:bg-accent'}`}>
+                                {type === 'personal' ? <Car className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                                {t(type === 'personal' ? 'Personal' : 'Business')}
                             </button>
                         ))}
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                        {flowCopy.panels.map(({ label, icon: Icon }) => (
-                            <Panel key={label} className="p-4">
-                                <Icon className="mb-3 h-5 w-5 text-primary" />
-                                <p className="text-xs font-semibold">{label}</p>
-                            </Panel>
-                        ))}
-                    </div>
-                </section>
 
-                <AppSurface className="p-5 sm:p-8">
-                    <div className="mb-7">
-                        <p className="mi-label text-primary">{isResetMode ? t('Password reset') : isLogin ? t('Sign in') : t('Register')}</p>
-                        <h2 className="mt-2 text-2xl font-bold tracking-tight">{isResetMode ? t('Reset your password') : flowCopy.formTitle}</h2>
-                        {isResetMode ? (
-                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                {t('Enter your account email and we will send a secure password reset link.')}
-                            </p>
-                        ) : !isLogin && accountType === 'business' && (
-                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                {t('Next step after signup: create your organization, add vehicles, invite team members, and start fleet tracking.')}
-                            </p>
-                        )}
-                    </div>
-
-                    <form onSubmit={isResetMode ? handlePasswordReset : handleSubmit} className="space-y-5">
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="mi-label">{t('Email')}</label>
-                                <div className="mi-field flex items-center gap-3 px-4">
-                                    <Mail className="h-5 w-5 shrink-0 text-muted-foreground" />
-                                    <input
-                                        type="email"
-                                        placeholder="name@example.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            {!isResetMode && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <label className="mi-label">{t('Password')}</label>
-                                        {isLogin && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setIsResetMode(true);
-                                                    setError('');
-                                                    setMessage('');
-                                                }}
-                                                className="text-xs font-semibold text-primary hover:underline"
-                                            >
-                                                {t('Forgot password?')}
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="mi-field flex items-center gap-3 px-4">
-                                        <Lock className="h-5 w-5 shrink-0 text-muted-foreground" />
-                                        <input
-                                            type={showPassword ? 'text' : 'password'}
-                                            placeholder={t('Enter your password')}
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                                            required
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword((current) => !current)}
-                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
-                                            aria-label={showPassword ? t('Hide password') : t('Show password')}
-                                            title={showPassword ? t('Hide password') : t('Show password')}
-                                        >
-                                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                    {!isResetMode && (
+                        <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-accent/50 p-1">
+                            <button type="button" onClick={() => isLogin || toggleMode()} className={`min-h-10 rounded-lg text-sm font-semibold ${isLogin ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>{t('Sign in')}</button>
+                            <button type="button" onClick={() => !isLogin || toggleMode()} className={`min-h-10 rounded-lg text-sm font-semibold ${!isLogin ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>{t('Register')}</button>
                         </div>
+                    )}
 
-                        {error && (
-                            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">
-                                {error}
-                            </div>
-                        )}
-                        {message && (
-                            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">
-                                {message}
-                            </div>
-                        )}
-
-                        <Button type="submit" className="h-12 w-full font-bold" size="lg" isLoading={loading}>
-                            {isResetMode ? t('Send reset link') : flowCopy.cta}
-                        </Button>
-                    </form>
-
-                    <div className="mt-6 grid gap-2 border-t border-border/70 pt-5">
-                        {isResetMode ? (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                className="w-full"
-                                onClick={() => {
-                                    setIsResetMode(false);
-                                    setError('');
-                                }}
-                            >
-                                {t('Back to sign in')}
-                            </Button>
-                        ) : (
-                            <Button variant="ghost" className="w-full" onClick={toggleMode}>
-                                {isLogin ? t('Create an account') : t('Sign in to your account')}
-                            </Button>
-                        )}
+                    <div className="mb-4 mt-4">
+                        <p className={`text-xs font-bold uppercase tracking-wide ${business ? 'text-indigo-400' : 'text-emerald-400'}`}>{business ? t('Business fleet workspace') : t('Personal garage')}</p>
+                        <h1 className="mt-1 text-xl font-bold sm:text-2xl">{isResetMode ? t('Reset your password') : isLogin ? t('Welcome back') : business ? t('Create your business login') : t('Create your personal garage')}</h1>
                     </div>
 
-                    <p className="mt-6 text-center text-xs leading-6 text-muted-foreground">
-                        {t('By continuing, you agree to our')}{' '}
-                        <Link to="/terms" className="font-semibold text-primary hover:underline">{t('Terms of Service')}</Link>
-                        {' '}{t('and')}{' '}
-                        <Link to="/privacy" className="font-semibold text-primary hover:underline">{t('Privacy Policy')}</Link>
-                        . {t('See also our')}{' '}
-                        <Link to="/cookies" className="font-semibold text-primary hover:underline">{t('Cookie Policy')}</Link>.
-                    </p>
+                    <form onSubmit={isResetMode ? handleReset : handleSubmit} className="space-y-3">
+                        <label className="block space-y-1.5">
+                            <span className="mi-label">{t('Email')}</span>
+                            <span className="mi-field flex items-center gap-3"><Mail className="h-4 w-4 shrink-0 text-muted-foreground" /><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="min-w-0 flex-1 bg-transparent outline-none" placeholder="name@example.com" required /></span>
+                        </label>
+                        {!isResetMode && (
+                            <label className="block space-y-1.5">
+                                <span className="flex items-center justify-between"><span className="mi-label">{t('Password')}</span>{isLogin && <button type="button" onClick={() => setIsResetMode(true)} className="text-xs font-semibold text-primary">{t('Forgot password?')}</button>}</span>
+                                <span className="mi-field flex items-center gap-3"><Lock className="h-4 w-4 shrink-0 text-muted-foreground" /><input type={showPassword ? 'text' : 'password'} autoComplete={isLogin ? 'current-password' : 'new-password'} value={password} onChange={(event) => setPassword(event.target.value)} className="min-w-0 flex-1 bg-transparent outline-none" required minLength={6} /><button type="button" onClick={() => setShowPassword((value) => !value)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg" aria-label={showPassword ? t('Hide password') : t('Show password')}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span>
+                            </label>
+                        )}
+                        {error && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-sm text-rose-300">{error}</p>}
+                        {message && <p className="rounded-xl bg-emerald-500/10 p-3 text-sm text-emerald-300">{message}</p>}
+                        <Button type="submit" isLoading={loading} className="h-11 w-full">{isResetMode ? t('Send reset link') : isLogin ? t('Sign In') : business ? t('Create Business Account') : t('Create Personal Account')}</Button>
+                        {isResetMode && <Button type="button" variant="ghost" className="h-10 w-full" onClick={() => setIsResetMode(false)}>{t('Back to sign in')}</Button>}
+                    </form>
                 </AppSurface>
-            </main>
 
-            <section className="mx-auto max-w-6xl px-4 pb-12">
-                <PaidPlanInterestForm />
-            </section>
+                <section className="order-2 space-y-5 lg:col-start-1 lg:row-start-1">
+                    <div>
+                        <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${business ? 'bg-indigo-500/10 text-indigo-400' : 'bg-emerald-500/10 text-emerald-400'}`}><ShieldCheck className="h-4 w-4" />{business ? t('Business Fleet') : t('Personal Garage')}</div>
+                        <h2 className="mt-4 text-3xl font-extrabold tracking-tight">{business ? t('Run shared vehicles with clear responsibility.') : t('Keep your own vehicles organized.')}</h2>
+                        <p className="mt-3 text-sm leading-6 text-muted-foreground">{business ? t('Use a team workspace for vehicles, compliance, maintenance, costs, assignments, and work orders.') : t('Keep vehicle details, documents, services, reminders, and expenses together without mixing them with business records.')}</p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">{benefits.map((benefit) => <Panel key={benefit} className="p-3 text-sm font-semibold">{t(benefit)}</Panel>)}</div>
+                    <DevelopmentDisclaimer compact />
+                    <p className="text-xs leading-6 text-muted-foreground">{t('By continuing, you agree to our')} <Link to="/terms" className="font-semibold text-primary">{t('Terms of Service')}</Link> {t('and')} <Link to="/privacy" className="font-semibold text-primary">{t('Privacy Policy')}</Link>.</p>
+                </section>
+            </main>
+            <section className="mx-auto max-w-6xl px-4 pb-12"><PaidPlanInterestForm /></section>
         </div>
     );
 };
