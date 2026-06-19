@@ -1048,5 +1048,9 @@
   "Use a team workspace for vehicles, compliance, maintenance, costs, assignments, and work orders.": "Perdorni nje hapesire ekipi per mjetet, pajtueshmerine, mirembajtjen, kostot, caktimet dhe urdhrat e punes.",
   "Keep vehicle details, documents, services, reminders, and expenses together without mixing them with business records.": "Mbani te dhenat, dokumentet, sherbimet, kujtesat dhe shpenzimet e mjetit bashke pa i perzier me regjistrat e biznesit.",
   "Shared organization fleet": "Flote e perbashket e organizates",
-  "Inspections and work orders": "Inspektime dhe urdhra pune"
+  "Inspections and work orders": "Inspektime dhe urdhra pune",
+  "Tap Share, then Add to Home Screen, then Add.": "Prek Ndaje, pastaj Shto ne ekranin kryesor dhe Shto.",
+  "Open the browser menu and choose Install app or Add to Home screen.": "Hap menune e shfletuesit dhe zgjidh Instalo aplikacionin ose Shto ne ekranin kryesor.",
+  "Use the install icon in the address bar or choose Install app from the browser menu.": "Perdor ikonen e instalimit ne shiritin e adreses ose zgjidh Instalo aplikacionin nga menuja.",
+  "Got it": "E kuptova"
 }

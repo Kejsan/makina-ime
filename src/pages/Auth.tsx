@@ -107,7 +107,7 @@ export const Auth = () => {
                     <img src={logo} alt="Makina Ime" width="658" height="658" className="h-9 w-auto" />
                     <span className="hidden text-sm font-extrabold sm:inline">Makina Ime</span>
                 </Link>
-                <div className="flex items-center gap-2"><PwaInstallButton compact /><ThemeToggle /></div>
+                <div className="flex items-center gap-2"><PwaInstallButton compact autoOffer /><ThemeToggle /></div>
             </header>
 
             <main className="mx-auto grid max-w-6xl gap-6 px-4 pb-10 pt-2 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start lg:py-10">

@@ -775,5 +775,9 @@
   "Use a team workspace for vehicles, compliance, maintenance, costs, assignments, and work orders.": "Usa un espacio de equipo para vehiculos, cumplimiento, mantenimiento, costes, asignaciones y ordenes de trabajo.",
   "Keep vehicle details, documents, services, reminders, and expenses together without mixing them with business records.": "Manten juntos los datos, documentos, servicios, recordatorios y gastos sin mezclarlos con registros empresariales.",
   "Shared organization fleet": "Flota compartida de la organizacion",
-  "Inspections and work orders": "Inspecciones y ordenes de trabajo"
+  "Inspections and work orders": "Inspecciones y ordenes de trabajo",
+  "Tap Share, then Add to Home Screen, then Add.": "Toca Compartir, luego Anadir a pantalla de inicio y finalmente Anadir.",
+  "Open the browser menu and choose Install app or Add to Home screen.": "Abre el menu del navegador y elige Instalar aplicacion o Anadir a pantalla de inicio.",
+  "Use the install icon in the address bar or choose Install app from the browser menu.": "Usa el icono de instalacion de la barra de direcciones o elige Instalar aplicacion en el menu del navegador.",
+  "Got it": "Entendido"
 }
