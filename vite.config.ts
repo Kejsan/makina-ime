@@ -34,6 +34,7 @@ export default defineConfig({
         scope: '/',
         start_url: '/',
         orientation: 'portrait',
+        prefer_related_applications: false,
         categories: ['utilities', 'productivity', 'finance'],
         icons: [
           {

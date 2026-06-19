@@ -8,14 +8,27 @@ export interface PwaInstallState {
     installed: boolean;
 }
 
+interface PwaInstallBridge {
+    deferredPrompt: BeforeInstallPromptEvent | null;
+    installed: boolean;
+    subscribe: (listener: () => void) => () => void;
+}
+
+declare global {
+    interface Window {
+        __makinaPwaInstallBridge?: PwaInstallBridge;
+    }
+}
+
 const isStandalone = () => {
     if (typeof window === 'undefined') return false;
     const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
     return window.matchMedia('(display-mode: standalone)').matches || navigatorWithStandalone.standalone === true;
 };
 
-let deferredPrompt: BeforeInstallPromptEvent | null = null;
-let state: PwaInstallState = { canPrompt: false, installed: isStandalone() };
+const bridge = typeof window === 'undefined' ? undefined : window.__makinaPwaInstallBridge;
+let deferredPrompt: BeforeInstallPromptEvent | null = bridge?.deferredPrompt || null;
+let state: PwaInstallState = { canPrompt: Boolean(deferredPrompt), installed: isStandalone() || bridge?.installed === true };
 const listeners = new Set<() => void>();
 
 const publish = (next: PwaInstallState) => {
@@ -25,16 +38,23 @@ const publish = (next: PwaInstallState) => {
 };
 
 if (typeof window !== 'undefined') {
-    window.addEventListener('beforeinstallprompt', (event) => {
-        event.preventDefault();
-        deferredPrompt = event as BeforeInstallPromptEvent;
-        publish({ canPrompt: true, installed: false });
-    });
+    if (bridge) {
+        bridge.subscribe(() => {
+            deferredPrompt = bridge.deferredPrompt;
+            publish({ canPrompt: Boolean(deferredPrompt), installed: isStandalone() || bridge.installed });
+        });
+    } else {
+        window.addEventListener('beforeinstallprompt', (event) => {
+            event.preventDefault();
+            deferredPrompt = event as BeforeInstallPromptEvent;
+            publish({ canPrompt: true, installed: false });
+        });
 
-    window.addEventListener('appinstalled', () => {
-        deferredPrompt = null;
-        publish({ canPrompt: false, installed: true });
-    });
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            publish({ canPrompt: false, installed: true });
+        });
+    }
 
     window.matchMedia('(display-mode: standalone)').addEventListener('change', () => {
         const installed = isStandalone();
@@ -55,6 +75,7 @@ export const requestPwaInstall = async (): Promise<'accepted' | 'dismissed' | 'i
     if (!prompt) return 'unavailable';
 
     deferredPrompt = null;
+    if (bridge) bridge.deferredPrompt = null;
     publish({ canPrompt: false, installed: false });
     try {
         await prompt.prompt();
@@ -64,4 +85,3 @@ export const requestPwaInstall = async (): Promise<'accepted' | 'dismissed' | 'i
         return 'unavailable';
     }
 };
-

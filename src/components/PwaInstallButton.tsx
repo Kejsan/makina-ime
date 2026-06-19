@@ -13,8 +13,6 @@ const offerCooldownMs = 30 * 24 * 60 * 60 * 1000;
 
 const isMobileBrowser = () => window.matchMedia('(max-width: 767px)').matches || /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 const isIosBrowser = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const isAndroidBrowser = () => /android/i.test(navigator.userAgent);
-
 const recentlyDismissed = () => {
     try {
         const stored = JSON.parse(window.localStorage.getItem(offerStorageKey) || '{}') as { dismissedAt?: number };
@@ -30,16 +28,16 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
     const [showInstructions, setShowInstructions] = useState(false);
     const [showOffer, setShowOffer] = useState(false);
     const isIos = isIosBrowser();
-    const isAndroid = isAndroidBrowser();
 
     useEffect(() => {
         if (!autoOffer || installState.installed || !isMobileBrowser()) return;
         if (window.sessionStorage.getItem(offerSessionKey) === 'true' || recentlyDismissed()) return;
+        if (!isIos && !installState.canPrompt) return;
 
         const timeout = window.setTimeout(() => {
             window.sessionStorage.setItem(offerSessionKey, 'true');
             setShowOffer(true);
-        }, isIos || installState.canPrompt ? 1400 : 4500);
+        }, 1400);
         return () => window.clearTimeout(timeout);
     }, [autoOffer, installState.canPrompt, installState.installed, isIos]);
 
@@ -51,12 +49,10 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
             const outcome = await requestPwaInstall();
             if (outcome === 'dismissed') {
                 window.localStorage.setItem(offerStorageKey, JSON.stringify({ dismissedAt: Date.now() }));
-            } else if (outcome === 'unavailable') {
-                setShowInstructions(true);
             }
             return;
         }
-        setShowInstructions(true);
+        if (isIos) setShowInstructions(true);
     };
 
     const dismissOffer = () => {
@@ -64,11 +60,7 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
         setShowOffer(false);
     };
 
-    const instruction = isIos
-        ? t('Tap Share, then Add to Home Screen, then Add.')
-        : isAndroid
-            ? t('Open the browser menu and choose Install app or Add to Home screen.')
-            : t('Use the install icon in the address bar or choose Install app from the browser menu.');
+    if (!isIos && !installState.canPrompt) return null;
 
     const overlays = (
         <>
@@ -94,10 +86,10 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
             {showInstructions && (
                 <Modal onClose={() => setShowInstructions(false)} titleId="install-instructions-title" className="max-w-sm p-5">
                     <div className="mb-5 flex items-start gap-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{isIos ? <Share className="h-5 w-5" /> : <Download className="h-5 w-5" />}</div>
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Share className="h-5 w-5" /></div>
                         <div className="min-w-0 flex-1">
                             <h2 id="install-instructions-title" className="text-lg font-bold">{t('Install Makina Ime')}</h2>
-                            <p className="mt-2 text-sm leading-6 text-muted-foreground">{instruction}</p>
+                            <p className="mt-2 text-sm leading-6 text-muted-foreground">{t('Tap Share, then Add to Home Screen, then Add.')}</p>
                         </div>
                         <button type="button" className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground" onClick={() => setShowInstructions(false)} aria-label={t('Close')}><X className="h-5 w-5" /></button>
                     </div>
