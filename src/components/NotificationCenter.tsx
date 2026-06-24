@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Bell, Check, Trash2, Clock, Loader2, X } from 'lucide-react';
-import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, orderBy, limit, writeBatch } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, orderBy, limit, writeBatch, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import type { AppNotification } from '../lib/types';
 import { cn } from '../lib/utils';
 import { Button } from './ui/Button';
+import { registerPushDevice, requestBrowserNotificationAccess } from '../lib/notifications';
 
 interface NotificationCenterProps {
     onClose: () => void;
@@ -73,9 +74,16 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
     };
 
     const enableBrowserNotifications = async () => {
-        if (!('Notification' in window)) return;
-        const permission = await Notification.requestPermission();
+        if (!user || !('Notification' in window)) return;
+        const permission = await requestBrowserNotificationAccess();
         setNotificationPermission(permission);
+        if (permission === 'granted') {
+            await registerPushDevice(user.uid).catch(() => null);
+            await setDoc(doc(db, 'users', user.uid), {
+                browserNotificationsEnabled: true,
+                updatedAt: serverTimestamp(),
+            }, { merge: true });
+        }
     };
 
     return (

@@ -12,6 +12,7 @@ import { AppSurface, PageHeader, Panel } from '../components/ui/design-system';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import type { UserPreferences } from '../lib/types';
+import { disableCurrentPushDevice, isPushConfigured, registerPushDevice, requestBrowserNotificationAccess } from '../lib/notifications';
 
 const defaultPreferences = (): UserPreferences => ({
     language: (i18n.language?.slice(0, 2) as UserPreferences['language']) || 'sq',
@@ -103,13 +104,36 @@ export const ProfileSettings = () => {
     };
 
     const requestBrowserNotifications = async () => {
+        if (!user) return;
         if (!('Notification' in window)) {
             setError('This browser does not support notifications.');
             return;
         }
 
-        const permission = await Notification.requestPermission();
-        updatePreference('browserNotificationsEnabled', permission === 'granted');
+        if (preferences.browserNotificationsEnabled) {
+            await disableCurrentPushDevice(user.uid).catch(() => undefined);
+            updatePreference('browserNotificationsEnabled', false);
+            await setDoc(doc(db, 'users', user.uid), {
+                browserNotificationsEnabled: false,
+                updatedAt: serverTimestamp(),
+            }, { merge: true });
+            setMessage('Browser notifications disabled for this device.');
+            return;
+        }
+
+        const permission = await requestBrowserNotificationAccess();
+        const enabled = permission === 'granted';
+        if (enabled) {
+            await registerPushDevice(user.uid).catch(() => null);
+        }
+        updatePreference('browserNotificationsEnabled', enabled);
+        await setDoc(doc(db, 'users', user.uid), {
+            browserNotificationsEnabled: enabled,
+            updatedAt: serverTimestamp(),
+        }, { merge: true });
+        setMessage(enabled
+            ? (isPushConfigured() ? 'Browser and PWA notifications enabled.' : 'Browser notifications enabled. PWA push needs VAPID configuration.')
+            : 'Notification permission was not granted.');
     };
 
     const exportMyData = async () => {

@@ -6,6 +6,7 @@ import {
     Building2,
     Car,
     CalendarDays,
+    AlertTriangle,
     LayoutDashboard,
     LogOut,
     Plus,
@@ -23,6 +24,8 @@ import { DevelopmentDisclaimer, PaidPlanInterestForm } from '../DevelopmentNotic
 import { ThemeToggle } from './design-system';
 import logo from '../../assets/Makina Ime Logo.webp';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { registerPushDevice, subscribeForegroundPushMessages } from '../../lib/notifications';
+import type { Reminder } from '../../lib/types';
 
 interface SidebarItemProps {
     icon: React.ElementType;
@@ -67,6 +70,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     const { workspaceType, organizationId, switchWorkspace } = useWorkspace();
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [overdueCount, setOverdueCount] = useState(0);
     const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(false);
 
     useEffect(() => {
@@ -100,6 +104,51 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
         return unsubscribe;
     }, [user, browserNotificationsEnabled]);
+
+    useEffect(() => {
+        if (!user || !browserNotificationsEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
+        void registerPushDevice(user.uid).catch(() => null);
+
+        let unsubscribe: (() => void) | undefined;
+        void subscribeForegroundPushMessages(({ title, body }) => {
+            new Notification(title, {
+                body,
+                icon: '/pwa-192x192.png',
+            });
+        }).then((nextUnsubscribe) => {
+            unsubscribe = nextUnsubscribe;
+        });
+
+        return () => {
+            unsubscribe?.();
+        };
+    }, [browserNotificationsEnabled, user]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const q = query(
+            collection(db, 'reminders'),
+            where('userId', '==', user.uid),
+            where('completed', '==', false)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const overdue = snapshot.docs
+                .map((item) => item.data() as Reminder)
+                .filter((reminder) => {
+                    const dueDate = reminder.dueDate?.toDate?.();
+                    if (!dueDate) return false;
+                    dueDate.setHours(0, 0, 0, 0);
+                    return dueDate < today;
+                });
+            setOverdueCount(overdue.length);
+        }, () => setOverdueCount(0));
+
+        return unsubscribe;
+    }, [user]);
 
     const handleSignOut = async () => {
         await signOut();
@@ -239,6 +288,18 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                     </header>
 
                     <div className="mx-auto min-w-0 max-w-7xl px-4 py-5 pb-28 sm:px-6 md:py-8 md:pb-8 lg:px-10">
+                        {overdueCount > 0 && (
+                            <Link
+                                to={workspaceType === 'business' && organizationId ? `/business/${organizationId}/calendar` : '/personal/calendar'}
+                                className="mb-5 flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-900 transition-colors hover:bg-amber-500/15 dark:text-amber-100"
+                            >
+                                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                                <span>
+                                    <span className="block font-bold">{overdueCount} overdue reminder{overdueCount === 1 ? '' : 's'}</span>
+                                    <span className="mt-1 block text-xs opacity-85">Open the calendar to review missed vehicle deadlines and maintenance tasks.</span>
+                                </span>
+                            </Link>
+                        )}
                         {children}
                         <div className="mt-8 grid gap-5">
                             <DevelopmentDisclaimer />
