@@ -35,6 +35,7 @@ export const VehicleDetails = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<VehicleTab>('overview');
     const [quickAddToken, setQuickAddToken] = useState(0);
+    const [quickMileageToken, setQuickMileageToken] = useState(0);
     const [message, setMessage] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -81,7 +82,8 @@ export const VehicleDetails = () => {
             reminder: 'reminders',
         };
         if (action === 'mileage') {
-            openEditModal();
+            setActiveTab('overview');
+            setQuickMileageToken((current) => current + 1);
             return;
         }
         const nextTab = action ? tabByAction[action] : undefined;
@@ -206,9 +208,9 @@ export const VehicleDetails = () => {
 
                 {message && <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">{message}</div>}
                 {needsCorrection && (
-                    <button type="button" onClick={openEditModal} className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-left text-sm text-amber-200">
+                    <button type="button" onClick={openEditModal} className="w-full rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 text-left text-sm text-foreground shadow-sm">
                         <strong className="block">This vehicle profile needs correction.</strong>
-                        <span className="mt-1 block text-amber-100/80">Review the highlighted fields before making further updates.</span>
+                        <span className="mt-1 block text-muted-foreground">Review the highlighted fields before making further updates.</span>
                     </button>
                 )}
 
@@ -234,7 +236,7 @@ export const VehicleDetails = () => {
 
                 {activeTab === 'overview' && (
                     <div className="space-y-5">
-                        <MaintenanceInsights vehicle={vehicle} onMessage={setMessage} />
+                        <MaintenanceInsights vehicle={vehicle} quickMileageToken={quickMileageToken} onMessage={setMessage} />
                         <AppSurface className="p-6">
                             <h2 className="mb-5 text-lg font-bold">Vehicle information</h2>
                             <div className="grid gap-3 sm:grid-cols-2">

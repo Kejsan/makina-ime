@@ -291,12 +291,12 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         {overdueCount > 0 && (
                             <Link
                                 to={workspaceType === 'business' && organizationId ? `/business/${organizationId}/calendar` : '/personal/calendar'}
-                                className="mb-5 flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-900 transition-colors hover:bg-amber-500/15 dark:text-amber-100"
+                                className="mb-5 flex items-start gap-3 rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 text-sm text-foreground shadow-sm transition-colors hover:bg-accent/50"
                             >
-                                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
                                 <span>
-                                    <span className="block font-bold">{overdueCount} overdue reminder{overdueCount === 1 ? '' : 's'}</span>
-                                    <span className="mt-1 block text-xs opacity-85">Open the calendar to review missed vehicle deadlines and maintenance tasks.</span>
+                                    <span className="block font-bold">{overdueCount} {t(overdueCount === 1 ? 'overdue reminder' : 'overdue reminders')}</span>
+                                    <span className="mt-1 block text-xs text-muted-foreground">{t('Open the calendar to review missed vehicle deadlines and maintenance tasks.')}</span>
                                 </span>
                             </Link>
                         )}

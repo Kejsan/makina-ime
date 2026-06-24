@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     addDoc,
     collection,
     doc,
+    getDocs,
     onSnapshot,
     orderBy,
     limit,
@@ -13,10 +15,12 @@ import {
     where,
     writeBatch,
 } from 'firebase/firestore';
-import { Archive, ClipboardCheck, Fuel, Plus, UserRound, Wrench } from 'lucide-react';
+import { Archive, ClipboardCheck, Fuel, Plus, UserRound, Wrench, X } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import type { AuditEvent, FuelLog, InspectionTemplate, MaintenanceProgram, OrganizationDriver, Vehicle } from '../lib/types';
+import { syncMileageTriggeredMaintenanceReminders } from '../lib/maintenanceReminders';
+import { displayDistanceToStoredKm, distanceUnit, formatDistance, storedKmToDisplayDistance } from '../lib/units';
+import type { AuditEvent, FuelLog, InspectionTemplate, MaintenanceProgram, MeasurementSystem, OrganizationDriver, ServiceRecord, Vehicle } from '../lib/types';
 import { parseInteger, parseMoney, VEHICLE_LIMITS } from '../lib/validation';
 import { AppSurface, EmptyState, MetricCard, Panel, StatusPill } from './ui/design-system';
 import { Button } from './ui/Button';
@@ -35,6 +39,7 @@ export const BusinessOperations = ({
     requestedAction?: string | null;
 }) => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const [drivers, setDrivers] = useState<OrganizationDriver[]>([]);
     const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
     const [programs, setPrograms] = useState<MaintenanceProgram[]>([]);
@@ -49,15 +54,25 @@ export const BusinessOperations = ({
     const [fuelForm, setFuelForm] = useState({ vehicleId: vehicles[0]?.id || '', date: new Date().toISOString().slice(0, 10), quantity: '', unitPrice: '', mileage: '', fuelType: 'Diesel', notes: '' });
     const [programForm, setProgramForm] = useState({ name: '', intervalKm: '', intervalMonths: '' });
     const [templateForm, setTemplateForm] = useState({ name: '', recurrenceDays: '', items: 'Exterior lights\nTires and pressure\nBrakes\nOil and fluids' });
+    const [measurementSystem, setMeasurementSystem] = useState<MeasurementSystem>('metric');
 
     const setModal = (value: 'driver' | 'fuel' | 'program' | 'template' | null) => {
         if (value === null) {
             setEditingDriver(null);
             setEditingProgram(null);
             setEditingTemplate(null);
+            setError('');
         }
         setModalState(value);
     };
+
+    useEffect(() => {
+        if (!user) return;
+        return onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+            const system = snapshot.data()?.measurementSystem;
+            setMeasurementSystem(system === 'imperial' ? 'imperial' : 'metric');
+        });
+    }, [user]);
 
     useEffect(() => onSnapshot(query(collection(db, 'organizations', organizationId, 'drivers'), where('organizationId', '==', organizationId)), (snapshot) => {
         setDrivers(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as OrganizationDriver).filter((item) => !item.archivedAt));
@@ -118,8 +133,14 @@ export const BusinessOperations = ({
             setError(quantity.error || unitPrice.error || mileage.error || 'Check the fuel values.');
             return;
         }
+        const storedMileage = displayDistanceToStoredKm(mileage.value, measurementSystem);
+        if (storedMileage > VEHICLE_LIMITS.maxMileage) {
+            setError(t('Mileage is too high.'));
+            return;
+        }
         const totalCost = Math.round(quantity.value * unitPrice.value * 100) / 100;
         const vehicleRef = doc(db, 'vehicles', fuelForm.vehicleId);
+        const selectedVehicle = vehicles.find((vehicle) => vehicle.id === fuelForm.vehicleId);
         const fuelRef = doc(collection(vehicleRef, 'fuelLogs'));
         const expenseRef = doc(collection(vehicleRef, 'expenses'));
         const odometerRef = doc(collection(vehicleRef, 'odometerLogs'));
@@ -132,7 +153,7 @@ export const BusinessOperations = ({
             quantity: quantity.value,
             unitPrice: unitPrice.value,
             totalCost,
-            mileage: mileage.value,
+            mileage: storedMileage,
             fuelType: fuelForm.fuelType,
             notes: fuelForm.notes.trim() || null,
             expenseId: expenseRef.id,
@@ -158,7 +179,7 @@ export const BusinessOperations = ({
         batch.set(odometerRef, {
             organizationId,
             vehicleId: fuelForm.vehicleId,
-            mileage: mileage.value,
+            mileage: storedMileage,
             recordedAt: date,
             sourceType: 'fuel',
             sourceId: fuelRef.id,
@@ -167,8 +188,20 @@ export const BusinessOperations = ({
             updatedAt: serverTimestamp(),
             updatedBy: user.uid,
         });
-        batch.update(vehicleRef, { currentMileage: mileage.value, updatedAt: serverTimestamp(), updatedBy: user.uid });
+        batch.update(vehicleRef, { currentMileage: storedMileage, updatedAt: serverTimestamp(), updatedBy: user.uid });
         await batch.commit();
+        if (selectedVehicle) {
+            const servicesSnapshot = await getDocs(query(collection(db, 'vehicles', fuelForm.vehicleId, 'services'), orderBy('date', 'desc')));
+            await syncMileageTriggeredMaintenanceReminders({
+                userId: user.uid,
+                vehicle: { ...selectedVehicle, currentMileage: storedMileage },
+                services: servicesSnapshot.docs.map((item) => ({ id: item.id, vehicleId: fuelForm.vehicleId, ...item.data() }) as ServiceRecord),
+                ownerType: 'organization',
+                ownerId: organizationId,
+                organizationId,
+                t,
+            });
+        }
         setError('');
         setFuelForm({ vehicleId: vehicles[0]?.id || '', date: new Date().toISOString().slice(0, 10), quantity: '', unitPrice: '', mileage: '', fuelType: 'Diesel', notes: '' });
         setModal(null);
@@ -180,11 +213,12 @@ export const BusinessOperations = ({
         const km = programForm.intervalKm ? parseInteger(programForm.intervalKm, { min: 1, max: VEHICLE_LIMITS.maxMileage }) : { value: null };
         const months = programForm.intervalMonths ? parseInteger(programForm.intervalMonths, { min: 1, max: 240 }) : { value: null };
         if ('error' in km && km.error || 'error' in months && months.error) { setError(('error' in km && km.error) || ('error' in months && months.error) || 'Invalid interval.'); return; }
+        const intervalKm = km.value ? displayDistanceToStoredKm(km.value, measurementSystem) : null;
         const payload = {
             organizationId,
             name: programForm.name.trim(),
             vehicleIds: editingProgram?.vehicleIds || [],
-            intervalKm: km.value,
+            intervalKm,
             intervalMonths: months.value,
             active: true,
             updatedAt: serverTimestamp(), updatedBy: user.uid,
@@ -222,7 +256,7 @@ export const BusinessOperations = ({
 
     const editProgram = (program: MaintenanceProgram) => {
         setEditingProgram(program);
-        setProgramForm({ name: program.name, intervalKm: program.intervalKm == null ? '' : String(program.intervalKm), intervalMonths: program.intervalMonths == null ? '' : String(program.intervalMonths) });
+        setProgramForm({ name: program.name, intervalKm: program.intervalKm == null ? '' : String(storedKmToDisplayDistance(program.intervalKm, measurementSystem)), intervalMonths: program.intervalMonths == null ? '' : String(program.intervalMonths) });
         setModal('program');
     };
 
@@ -238,16 +272,112 @@ export const BusinessOperations = ({
             <div className="grid gap-3 sm:grid-cols-3"><MetricCard icon={UserRound} label="Active drivers" value={drivers.filter((item) => item.status === 'active').length.toString()} tone="blue" /><MetricCard icon={Fuel} label="Fuel spend" value={`€${fuelCost.toFixed(2)}`} detail={`${fuelQuantity.toFixed(2)} units`} tone="emerald" /><MetricCard icon={Wrench} label="Maintenance programs" value={programs.filter((item) => item.active).length.toString()} tone="amber" /></div>
             <div className="grid gap-5 lg:grid-cols-2">
                 <AppSurface className="p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold">Driver directory</h3>{canEdit && <Button size="sm" variant="ghost" onClick={() => setModal('driver')}><Plus className="h-4 w-4" /></Button>}</div>{drivers.length === 0 ? <EmptyState icon={UserRound} title="No drivers" description="Add drivers independently from login memberships." /> : <div className="space-y-2">{drivers.map((driver) => <Panel key={driver.id} role={canEdit ? 'button' : undefined} tabIndex={canEdit ? 0 : undefined} onClick={() => canEdit && editDriver(driver)} onKeyDown={(event) => { if (canEdit && (event.key === 'Enter' || event.key === ' ')) editDriver(driver); }} className="flex cursor-pointer items-center justify-between p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><div><p className="font-semibold">{driver.displayName}</p><p className="text-xs text-muted-foreground">{driver.department || driver.employeeId || 'No department'}</p></div><div className="flex items-center gap-2"><StatusPill tone={driver.status === 'active' ? 'emerald' : 'slate'}>{driver.status}</StatusPill>{canEdit && <button onClick={(event) => { event.stopPropagation(); void archive(`organizations/${organizationId}/drivers`, driver.id); }} className="p-2" aria-label="Archive driver"><Archive className="h-4 w-4" /></button>}</div></Panel>)}</div>}</AppSurface>
-                <AppSurface className="p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold">Preventive maintenance</h3>{canEdit && <Button size="sm" variant="ghost" onClick={() => setModal('program')}><Plus className="h-4 w-4" /></Button>}</div>{programs.length === 0 ? <EmptyState icon={Wrench} title="No programs" description="Create date- or mileage-based maintenance intervals." /> : <div className="space-y-2">{programs.map((program) => <Panel key={program.id} role={canEdit ? 'button' : undefined} tabIndex={canEdit ? 0 : undefined} onClick={() => canEdit && editProgram(program)} className="flex cursor-pointer items-center justify-between p-3"><div><p className="font-semibold">{program.name}</p><p className="mt-1 text-xs text-muted-foreground">{program.intervalKm ? `${program.intervalKm.toLocaleString()} km` : ''}{program.intervalKm && program.intervalMonths ? ' or ' : ''}{program.intervalMonths ? `${program.intervalMonths} months` : ''}</p></div>{canEdit && <button onClick={(event) => { event.stopPropagation(); void archive(`organizations/${organizationId}/maintenancePrograms`, program.id); }} className="p-2" aria-label="Archive maintenance program"><Archive className="h-4 w-4" /></button>}</Panel>)}</div>}</AppSurface>
-                <AppSurface className="p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold">Recent fuel logs</h3>{canEdit && <Button size="sm" variant="ghost" onClick={() => setModal('fuel')}><Plus className="h-4 w-4" /></Button>}</div>{fuelLogs.length === 0 ? <EmptyState icon={Fuel} title="No fuel logs" description="Record fuel quantity, price, cost, and odometer together." /> : <div className="space-y-2">{fuelLogs.sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)).slice(0, 8).map((log) => <Panel key={log.id} className="flex justify-between p-3"><div><p className="font-semibold">{vehicles.find((vehicle) => vehicle.id === log.vehicleId)?.plateNumber || 'Vehicle'}</p><p className="text-xs text-muted-foreground">{log.quantity} × €{log.unitPrice.toFixed(2)} · {log.mileage.toLocaleString()} km</p></div><strong>€{log.totalCost.toFixed(2)}</strong></Panel>)}</div>}</AppSurface>
+                <AppSurface className="p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold">Preventive maintenance</h3>{canEdit && <Button size="sm" variant="ghost" onClick={() => setModal('program')}><Plus className="h-4 w-4" /></Button>}</div>{programs.length === 0 ? <EmptyState icon={Wrench} title="No programs" description="Create date- or mileage-based maintenance intervals." /> : <div className="space-y-2">{programs.map((program) => <Panel key={program.id} role={canEdit ? 'button' : undefined} tabIndex={canEdit ? 0 : undefined} onClick={() => canEdit && editProgram(program)} className="flex cursor-pointer items-center justify-between p-3"><div><p className="font-semibold">{program.name}</p><p className="mt-1 text-xs text-muted-foreground">{program.intervalKm ? formatDistance(program.intervalKm, measurementSystem) : ''}{program.intervalKm && program.intervalMonths ? ' or ' : ''}{program.intervalMonths ? `${program.intervalMonths} months` : ''}</p></div>{canEdit && <button onClick={(event) => { event.stopPropagation(); void archive(`organizations/${organizationId}/maintenancePrograms`, program.id); }} className="p-2" aria-label="Archive maintenance program"><Archive className="h-4 w-4" /></button>}</Panel>)}</div>}</AppSurface>
+                <AppSurface className="p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold">Recent fuel logs</h3>{canEdit && <Button size="sm" variant="ghost" onClick={() => setModal('fuel')}><Plus className="h-4 w-4" /></Button>}</div>{fuelLogs.length === 0 ? <EmptyState icon={Fuel} title="No fuel logs" description="Record fuel quantity, price, cost, and odometer together." /> : <div className="space-y-2">{fuelLogs.sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)).slice(0, 8).map((log) => <Panel key={log.id} className="flex justify-between p-3"><div><p className="font-semibold">{vehicles.find((vehicle) => vehicle.id === log.vehicleId)?.plateNumber || 'Vehicle'}</p><p className="text-xs text-muted-foreground">{log.quantity} × €{log.unitPrice.toFixed(2)} · {formatDistance(log.mileage, measurementSystem)}</p></div><strong>€{log.totalCost.toFixed(2)}</strong></Panel>)}</div>}</AppSurface>
                 <AppSurface className="p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-bold">Inspection templates</h3>{canEdit && <Button size="sm" variant="ghost" onClick={() => setModal('template')}><Plus className="h-4 w-4" /></Button>}</div>{templates.length === 0 ? <EmptyState icon={ClipboardCheck} title="No templates" description="Standardize recurring readiness checks." /> : <div className="space-y-2">{templates.map((template) => <Panel key={template.id} role={canEdit ? 'button' : undefined} tabIndex={canEdit ? 0 : undefined} onClick={() => canEdit && editTemplate(template)} className="flex cursor-pointer items-center justify-between p-3"><div><p className="font-semibold">{template.name}</p><p className="text-xs text-muted-foreground">{template.items.length} checks{template.recurrenceDays ? ` · every ${template.recurrenceDays} days` : ''}</p></div>{canEdit && <button onClick={(event) => { event.stopPropagation(); void archive(`organizations/${organizationId}/inspectionTemplates`, template.id); }} className="p-2" aria-label="Archive inspection template"><Archive className="h-4 w-4" /></button>}</Panel>)}</div>}</AppSurface>
             </div>
             <AppSurface className="p-5"><h3 className="mb-4 font-bold">Recent activity</h3>{auditEvents.length === 0 ? <p className="text-sm text-muted-foreground">Audited business changes will appear here after the audit function is deployed.</p> : <div className="divide-y divide-border/60">{auditEvents.map((event) => <div key={event.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold"><span className="capitalize">{event.action}</span> {event.recordType}</p><p className="text-xs text-muted-foreground">{event.changedFields.slice(0, 6).join(', ') || 'Record created'}</p></div><p className="text-xs text-muted-foreground">{event.createdAt?.toDate?.().toLocaleString() || 'Just now'} · {event.actorId.slice(0, 8)}</p></div>)}</div>}</AppSurface>
 
-            {modal === 'driver' && <Modal onClose={() => setModal(null)} titleId="driver-form-title" className="max-w-lg"><h2 id="driver-form-title" className="mb-4 text-xl font-bold">Add driver</h2><form onSubmit={createDriver} className="space-y-4"><Input label="Name" value={driverForm.displayName} onChange={(event) => setDriverForm({ ...driverForm, displayName: event.target.value })} required /><div className="grid gap-4 sm:grid-cols-2"><Input label="Employee ID" value={driverForm.employeeId} onChange={(event) => setDriverForm({ ...driverForm, employeeId: event.target.value })} /><Input label="Department" value={driverForm.department} onChange={(event) => setDriverForm({ ...driverForm, department: event.target.value })} /><Input label="Email" type="email" value={driverForm.email} onChange={(event) => setDriverForm({ ...driverForm, email: event.target.value })} /><Input label="Phone" value={driverForm.phone} onChange={(event) => setDriverForm({ ...driverForm, phone: event.target.value })} /></div><Button type="submit" className="w-full">Save driver</Button></form></Modal>}
-            {modal === 'fuel' && <Modal onClose={() => setModal(null)} titleId="fuel-form-title" className="max-w-lg"><h2 id="fuel-form-title" className="mb-4 text-xl font-bold">Add fuel log</h2><form onSubmit={createFuelLog} className="space-y-4"><label className="block space-y-2"><span className="mi-label">Vehicle</span><select className="mi-field" value={fuelForm.vehicleId} onChange={(event) => setFuelForm({ ...fuelForm, vehicleId: event.target.value })}><option value="">Choose vehicle</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.make} {vehicle.model} · {vehicle.plateNumber}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><Input label="Date" type="date" value={fuelForm.date} onChange={(event) => setFuelForm({ ...fuelForm, date: event.target.value })} /><Input label="Quantity" inputMode="decimal" value={fuelForm.quantity} onChange={(event) => setFuelForm({ ...fuelForm, quantity: event.target.value })} /><Input label="Unit price" inputMode="decimal" value={fuelForm.unitPrice} onChange={(event) => setFuelForm({ ...fuelForm, unitPrice: event.target.value })} /><Input label="Mileage" inputMode="numeric" value={fuelForm.mileage} onChange={(event) => setFuelForm({ ...fuelForm, mileage: event.target.value })} /><Input label="Fuel type" value={fuelForm.fuelType} onChange={(event) => setFuelForm({ ...fuelForm, fuelType: event.target.value })} /><Input label="Notes" value={fuelForm.notes} onChange={(event) => setFuelForm({ ...fuelForm, notes: event.target.value })} /></div>{error && <p className="text-sm text-rose-400">{error}</p>}<Button type="submit" className="w-full">Save fuel log</Button></form></Modal>}
-            {modal === 'program' && <Modal onClose={() => setModal(null)} titleId="program-form-title" className="max-w-lg"><h2 id="program-form-title" className="mb-4 text-xl font-bold">Add maintenance program</h2><form onSubmit={createProgram} className="space-y-4"><Input label="Program name" value={programForm.name} onChange={(event) => setProgramForm({ ...programForm, name: event.target.value })} required /><div className="grid gap-4 sm:grid-cols-2"><Input label="Interval (km)" inputMode="numeric" value={programForm.intervalKm} onChange={(event) => setProgramForm({ ...programForm, intervalKm: event.target.value })} /><Input label="Interval (months)" inputMode="numeric" value={programForm.intervalMonths} onChange={(event) => setProgramForm({ ...programForm, intervalMonths: event.target.value })} /></div>{error && <p className="text-sm text-rose-400">{error}</p>}<Button type="submit" className="w-full">Save program</Button></form></Modal>}
-            {modal === 'template' && <Modal onClose={() => setModal(null)} titleId="template-form-title" className="max-w-lg"><h2 id="template-form-title" className="mb-4 text-xl font-bold">Add inspection template</h2><form onSubmit={createTemplate} className="space-y-4"><Input label="Template name" value={templateForm.name} onChange={(event) => setTemplateForm({ ...templateForm, name: event.target.value })} required /><Input label="Repeat every (days)" inputMode="numeric" value={templateForm.recurrenceDays} onChange={(event) => setTemplateForm({ ...templateForm, recurrenceDays: event.target.value })} /><label className="block space-y-2"><span className="mi-label">Checklist items, one per line</span><textarea className="mi-field h-36 py-3" value={templateForm.items} onChange={(event) => setTemplateForm({ ...templateForm, items: event.target.value })} /></label>{error && <p className="text-sm text-rose-400">{error}</p>}<Button type="submit" className="w-full">Save template</Button></form></Modal>}
+            {modal === 'driver' && (
+                <Modal onClose={() => setModal(null)} titleId="driver-form-title" className="max-w-lg">
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                        <h2 id="driver-form-title" className="text-xl font-bold">{editingDriver ? 'Edit driver' : 'Add driver'}</h2>
+                        <button type="button" onClick={() => setModal(null)} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close">
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                    <form onSubmit={createDriver} className="space-y-4">
+                        <Input label="Name" value={driverForm.displayName} onChange={(event) => setDriverForm({ ...driverForm, displayName: event.target.value })} required />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Input label="Employee ID" value={driverForm.employeeId} onChange={(event) => setDriverForm({ ...driverForm, employeeId: event.target.value })} />
+                            <Input label="Department" value={driverForm.department} onChange={(event) => setDriverForm({ ...driverForm, department: event.target.value })} />
+                            <Input label="Email" type="email" value={driverForm.email} onChange={(event) => setDriverForm({ ...driverForm, email: event.target.value })} />
+                            <Input label="Phone" value={driverForm.phone} onChange={(event) => setDriverForm({ ...driverForm, phone: event.target.value })} />
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button type="submit" className="h-11 flex-1">Save driver</Button>
+                            <Button type="button" variant="outline" className="h-11" onClick={() => setModal(null)}>Cancel</Button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+            {modal === 'fuel' && (
+                <Modal onClose={() => setModal(null)} titleId="fuel-form-title" className="max-w-lg">
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                        <h2 id="fuel-form-title" className="text-xl font-bold">Add fuel log</h2>
+                        <button type="button" onClick={() => setModal(null)} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close">
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                    <form onSubmit={createFuelLog} className="space-y-4">
+                        <label className="block space-y-2">
+                            <span className="mi-label">Vehicle</span>
+                            <select className="mi-field" value={fuelForm.vehicleId} onChange={(event) => setFuelForm({ ...fuelForm, vehicleId: event.target.value })}>
+                                <option value="">Choose vehicle</option>
+                                {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.make} {vehicle.model} · {vehicle.plateNumber}</option>)}
+                            </select>
+                        </label>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Input label="Date" type="date" value={fuelForm.date} onChange={(event) => setFuelForm({ ...fuelForm, date: event.target.value })} />
+                            <Input label="Quantity" inputMode="decimal" value={fuelForm.quantity} onChange={(event) => setFuelForm({ ...fuelForm, quantity: event.target.value })} />
+                            <Input label="Unit price" inputMode="decimal" value={fuelForm.unitPrice} onChange={(event) => setFuelForm({ ...fuelForm, unitPrice: event.target.value })} />
+                            <Input label={`${t('Odometer reading')} (${t(distanceUnit(measurementSystem))})`} inputMode="numeric" value={fuelForm.mileage} onChange={(event) => setFuelForm({ ...fuelForm, mileage: event.target.value })} />
+                            <Input label="Fuel type" value={fuelForm.fuelType} onChange={(event) => setFuelForm({ ...fuelForm, fuelType: event.target.value })} />
+                            <Input label="Notes" value={fuelForm.notes} onChange={(event) => setFuelForm({ ...fuelForm, notes: event.target.value })} />
+                        </div>
+                        {error && <p className="text-sm text-rose-400">{error}</p>}
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button type="submit" className="h-11 flex-1">Save fuel log</Button>
+                            <Button type="button" variant="outline" className="h-11" onClick={() => setModal(null)}>Cancel</Button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+            {modal === 'program' && (
+                <Modal onClose={() => setModal(null)} titleId="program-form-title" className="max-w-lg">
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                        <h2 id="program-form-title" className="text-xl font-bold">{editingProgram ? 'Edit maintenance program' : 'Add maintenance program'}</h2>
+                        <button type="button" onClick={() => setModal(null)} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close">
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                    <form onSubmit={createProgram} className="space-y-4">
+                        <Input label="Program name" value={programForm.name} onChange={(event) => setProgramForm({ ...programForm, name: event.target.value })} required />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Input label={`Interval (${t(distanceUnit(measurementSystem))})`} inputMode="numeric" value={programForm.intervalKm} onChange={(event) => setProgramForm({ ...programForm, intervalKm: event.target.value })} />
+                            <Input label="Interval (months)" inputMode="numeric" value={programForm.intervalMonths} onChange={(event) => setProgramForm({ ...programForm, intervalMonths: event.target.value })} />
+                        </div>
+                        {error && <p className="text-sm text-rose-400">{error}</p>}
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button type="submit" className="h-11 flex-1">Save program</Button>
+                            <Button type="button" variant="outline" className="h-11" onClick={() => setModal(null)}>Cancel</Button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+            {modal === 'template' && (
+                <Modal onClose={() => setModal(null)} titleId="template-form-title" className="max-w-lg">
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                        <h2 id="template-form-title" className="text-xl font-bold">{editingTemplate ? 'Edit inspection template' : 'Add inspection template'}</h2>
+                        <button type="button" onClick={() => setModal(null)} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close">
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                    <form onSubmit={createTemplate} className="space-y-4">
+                        <Input label="Template name" value={templateForm.name} onChange={(event) => setTemplateForm({ ...templateForm, name: event.target.value })} required />
+                        <Input label="Repeat every (days)" inputMode="numeric" value={templateForm.recurrenceDays} onChange={(event) => setTemplateForm({ ...templateForm, recurrenceDays: event.target.value })} />
+                        <label className="block space-y-2">
+                            <span className="mi-label">Checklist items, one per line</span>
+                            <textarea className="mi-field h-36 py-3" value={templateForm.items} onChange={(event) => setTemplateForm({ ...templateForm, items: event.target.value })} />
+                        </label>
+                        {error && <p className="text-sm text-rose-400">{error}</p>}
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button type="submit" className="h-11 flex-1">Save template</Button>
+                            <Button type="button" variant="outline" className="h-11" onClick={() => setModal(null)}>Cancel</Button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
         </section>
     );
 };

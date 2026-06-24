@@ -2,6 +2,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export type WorkspaceOwnerType = 'personal' | 'organization';
 export type WorkspaceType = 'personal' | 'business';
+export type MeasurementSystem = 'metric' | 'imperial';
 export type OrganizationRole = 'owner' | 'admin' | 'manager' | 'driver' | 'viewer';
 export type OrganizationMemberStatus = 'active' | 'invited' | 'suspended';
 export type BusinessVehicleStatus = 'active' | 'in_service' | 'needs_attention' | 'out_of_service' | 'reserved' | 'sold' | 'archived';
@@ -213,6 +214,7 @@ export interface UserPreferences {
     defaultReminderLeadTimeDays: number;
     browserNotificationsEnabled: boolean;
     emailReminderEnabled: boolean;
+    measurementSystem: MeasurementSystem;
     lastWorkspaceType?: WorkspaceType;
     lastOrganizationId?: string | null;
     updatedAt?: Timestamp;

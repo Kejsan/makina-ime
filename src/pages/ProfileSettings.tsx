@@ -20,6 +20,7 @@ const defaultPreferences = (): UserPreferences => ({
     defaultReminderLeadTimeDays: 14,
     browserNotificationsEnabled: false,
     emailReminderEnabled: true,
+    measurementSystem: 'metric',
 });
 
 const toPlainJson = (value: unknown): unknown => {
@@ -256,9 +257,9 @@ export const ProfileSettings = () => {
                                 <p className="text-sm text-muted-foreground">These preferences control app labels and reminder delivery behavior.</p>
                             </div>
                         </div>
-                        <div className="grid gap-4 md:grid-cols-3">
+                        <div className="grid gap-4 md:grid-cols-4">
                             <div className="space-y-2">
-                                <label className="mi-label">Language</label>
+                                <label className="mi-label">{t('Language')}</label>
                                 <select className="mi-field" value={preferences.language} onChange={(event) => updatePreference('language', event.target.value as UserPreferences['language'])}>
                                     <option value="sq">Shqip</option>
                                     <option value="en">English</option>
@@ -268,7 +269,7 @@ export const ProfileSettings = () => {
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <label className="mi-label">Timezone</label>
+                                <label className="mi-label">{t('Timezone')}</label>
                                 <select className="mi-field" value={preferences.timezone} onChange={(event) => updatePreference('timezone', event.target.value)}>
                                     <option value="Europe/Tirane">Europe/Tirane</option>
                                     <option value="Europe/Rome">Europe/Rome</option>
@@ -277,8 +278,15 @@ export const ProfileSettings = () => {
                                     <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>Browser default</option>
                                 </select>
                             </div>
+                            <div className="space-y-2">
+                                <label className="mi-label">{t('Measurement system')}</label>
+                                <select className="mi-field" value={preferences.measurementSystem} onChange={(event) => updatePreference('measurementSystem', event.target.value as UserPreferences['measurementSystem'])}>
+                                    <option value="metric">{t('Metric (km, L)')}</option>
+                                    <option value="imperial">{t('Imperial (mi, gal)')}</option>
+                                </select>
+                            </div>
                             <Input
-                                label="Default reminder lead time"
+                                label={t('Default reminder lead time')}
                                 type="text"
                                 inputMode="numeric"
                                 maxLength={3}
@@ -297,8 +305,8 @@ export const ProfileSettings = () => {
                                 <span className="flex items-center gap-3">
                                     <Bell className="h-5 w-5 text-primary" />
                                     <span>
-                                        <span className="block font-semibold">Browser notifications</span>
-                                        <span className="text-xs text-muted-foreground">Uses this browser permission and in-app notification records.</span>
+                                        <span className="block font-semibold">{t('Browser notifications')}</span>
+                                        <span className="text-xs text-muted-foreground">{t('Uses this browser permission and in-app notification records.')}</span>
                                     </span>
                                 </span>
                                 <input type="checkbox" checked={preferences.browserNotificationsEnabled} onChange={requestBrowserNotifications} className="h-5 w-5 accent-primary" />
@@ -307,14 +315,14 @@ export const ProfileSettings = () => {
                                 <span className="flex items-center gap-3">
                                     <Mail className="h-5 w-5 text-primary" />
                                     <span>
-                                        <span className="block font-semibold">Email reminders</span>
-                                        <span className="text-xs text-muted-foreground">Transactional reminder emails only.</span>
+                                        <span className="block font-semibold">{t('Email reminders')}</span>
+                                        <span className="text-xs text-muted-foreground">{t('Transactional reminder emails only.')}</span>
                                     </span>
                                 </span>
                                 <input type="checkbox" checked={preferences.emailReminderEnabled} onChange={(event) => updatePreference('emailReminderEnabled', event.target.checked)} className="h-5 w-5 accent-primary" />
                             </label>
                         </div>
-                        <Button className="mt-4" onClick={savePreferences} isLoading={savingPreferences}>Save preferences</Button>
+                        <Button className="mt-4" onClick={savePreferences} isLoading={savingPreferences}>{t('Save preferences')}</Button>
                         <div className="mt-3">
                             <PwaInstallButton />
                         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -67,6 +68,7 @@ const groupLabels = {
 };
 
 export const QuickAddSheet = () => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const { workspaceType, organizationId, capabilities } = useWorkspace();
     const location = useLocation();
@@ -127,10 +129,12 @@ export const QuickAddSheet = () => {
             <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-border sm:hidden" />
             <div className="flex items-start justify-between gap-4 border-b border-border p-5">
                 <div>
-                    <p className="mi-label text-primary">{workspaceType === 'business' ? 'Business workspace' : 'Personal garage'}</p>
-                    <h2 id="quick-add-title" className="mt-1 text-xl font-bold">{pendingAction ? `Choose vehicle for ${pendingAction.label}` : 'What would you like to add?'}</h2>
+                    <p className="mi-label text-primary">{workspaceType === 'business' ? t('Business workspace') : t('Personal garage')}</p>
+                    <h2 id="quick-add-title" className="mt-1 text-xl font-bold">
+                        {pendingAction ? t('Choose vehicle for {{action}}', { action: t(pendingAction.label) }) : t('What would you like to add?')}
+                    </h2>
                 </div>
-                <button type="button" onClick={close} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent" aria-label="Close">
+                <button type="button" onClick={close} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent" aria-label={t('Close')}>
                     <X className="h-5 w-5" />
                 </button>
             </div>
@@ -138,24 +142,24 @@ export const QuickAddSheet = () => {
             {pendingAction ? (
                 <div className="space-y-4 p-5">
                     {vehicles.length === 0 ? (
-                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-                            Add a vehicle before creating this record.
+                        <div className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 text-sm text-foreground shadow-sm">
+                            {t('Add a vehicle before creating this record.')}
                         </div>
                     ) : (
                         <>
                             <label className="space-y-2">
-                                <span className="mi-label">Vehicle</span>
+                                <span className="mi-label">{t('Vehicle')}</span>
                                 <select className="mi-field" value={selectedVehicleId} onChange={(event) => setSelectedVehicleId(event.target.value)}>
-                                    <option value="">Choose a vehicle</option>
+                                    <option value="">{t('Choose a vehicle')}</option>
                                     {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.make} {vehicle.model} · {vehicle.plateNumber || vehicle.year}</option>)}
                                 </select>
                             </label>
                             <button type="button" disabled={!selectedVehicleId} onClick={() => execute(pendingAction)} className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50">
-                                Continue
+                                {t('Continue')}
                             </button>
                         </>
                     )}
-                    <button type="button" onClick={() => setPendingAction(null)} className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-border text-sm font-semibold">Back to actions</button>
+                    <button type="button" onClick={() => setPendingAction(null)} className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-border text-sm font-semibold">{t('Back to actions')}</button>
                 </div>
             ) : (
                 <div className="max-h-[min(68dvh,36rem)] overflow-y-auto p-5">
@@ -164,7 +168,7 @@ export const QuickAddSheet = () => {
                         if (grouped.length === 0) return null;
                         return (
                             <section key={group} className="mb-5 last:mb-0">
-                                <h3 className="mi-label mb-2">{groupLabels[group]}</h3>
+                                <h3 className="mi-label mb-2">{t(groupLabels[group])}</h3>
                                 <div className="grid grid-cols-2 gap-2">
                                     {grouped.map((action) => {
                                         const Icon = icons[action.id];
@@ -172,7 +176,7 @@ export const QuickAddSheet = () => {
                                         return (
                                             <button key={action.id} type="button" onClick={() => unavailable ? setPendingAction(action) : execute(action)} className="flex min-h-16 items-center gap-3 rounded-xl border border-border bg-background/60 p-3 text-left hover:border-primary/40 hover:bg-accent">
                                                 <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
-                                                <span className="text-sm font-semibold">{action.label}</span>
+                                                <span className="text-sm font-semibold">{t(action.label)}</span>
                                             </button>
                                         );
                                     })}

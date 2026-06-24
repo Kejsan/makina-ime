@@ -84,6 +84,7 @@ export const BusinessVehicleDetails = () => {
     const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
     const [activeTab, setActiveTab] = useState<BusinessVehicleTab>('overview');
     const [quickAddToken, setQuickAddToken] = useState(0);
+    const [quickMileageToken, setQuickMileageToken] = useState(0);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState('');
 
@@ -158,12 +159,16 @@ export const BusinessVehicleDetails = () => {
             inspection: 'inspections',
             issue: 'issues',
             workOrder: 'workOrders',
-            mileage: 'assignment',
+            mileage: 'overview',
         };
         const nextTab = action ? tabByAction[action] : undefined;
         if (nextTab) {
             setActiveTab(nextTab);
-            setQuickAddToken((current) => current + 1);
+            if (action === 'mileage') {
+                setQuickMileageToken((current) => current + 1);
+            } else {
+                setQuickAddToken((current) => current + 1);
+            }
         }
     }, [searchParams]);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -213,9 +218,9 @@ export const BusinessVehicleDetails = () => {
 
                 {message && <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">{message}</div>}
                 {profileNeedsCorrection && (
-                    <button type="button" onClick={() => setActiveTab('assignment')} className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-left text-sm text-amber-200">
+                    <button type="button" onClick={() => setActiveTab('assignment')} className="w-full rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 text-left text-sm text-foreground shadow-sm">
                         <strong className="block">This vehicle profile needs correction.</strong>
-                        <span className="mt-1 block text-amber-100/80">Review the highlighted fields before making further updates.</span>
+                        <span className="mt-1 block text-muted-foreground">Review the highlighted fields before making further updates.</span>
                     </button>
                 )}
 
@@ -248,6 +253,7 @@ export const BusinessVehicleDetails = () => {
                             organizationId={orgId}
                             editable={editable}
                             canCreateWorkOrder={editable}
+                            quickMileageToken={quickMileageToken}
                             onMessage={setMessage}
                         />
 

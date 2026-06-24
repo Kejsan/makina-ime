@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
 import { AlertTriangle, Bell, CheckCircle2, Gauge, Info, Settings, Wrench } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
 import { buildMaintenanceInsights, getLatestServiceSnapshot } from '../lib/maintenance';
-import type { MaintenanceInsight, ServiceRecord, Vehicle, WorkspaceOwnerType } from '../lib/types';
+import { syncMileageTriggeredMaintenanceReminders } from '../lib/maintenanceReminders';
+import type { MaintenanceInsight, MeasurementSystem, ServiceRecord, Vehicle, WorkspaceOwnerType } from '../lib/types';
+import { displayDistanceToStoredKm, distanceUnit, formatDistance, storedKmToDisplayDistance } from '../lib/units';
 import { cn } from '../lib/utils';
 import { parseInteger, VEHICLE_LIMITS } from '../lib/validation';
 import { Button } from './ui/Button';
@@ -48,6 +50,7 @@ export const MaintenanceInsights = ({
     organizationId,
     editable = true,
     canCreateWorkOrder = false,
+    quickMileageToken = 0,
     onMessage,
 }: {
     vehicle: Vehicle;
@@ -56,6 +59,7 @@ export const MaintenanceInsights = ({
     organizationId?: string;
     editable?: boolean;
     canCreateWorkOrder?: boolean;
+    quickMileageToken?: number;
     onMessage?: (message: string) => void;
 }) => {
     const { t } = useTranslation();
@@ -67,10 +71,25 @@ export const MaintenanceInsights = ({
     const [savingMileage, setSavingMileage] = useState(false);
     const [mileageError, setMileageError] = useState('');
     const [actionId, setActionId] = useState('');
+    const [measurementSystem, setMeasurementSystem] = useState<MeasurementSystem>('metric');
 
     useEffect(() => {
-        setMileageValue(vehicle.currentMileage ? String(vehicle.currentMileage) : '');
-    }, [vehicle.currentMileage]);
+        setMileageValue(vehicle.currentMileage ? String(storedKmToDisplayDistance(vehicle.currentMileage, measurementSystem)) : '');
+    }, [measurementSystem, vehicle.currentMileage]);
+
+    useEffect(() => {
+        if (!user) return;
+        return onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+            const system = snapshot.data()?.measurementSystem;
+            setMeasurementSystem(system === 'imperial' ? 'imperial' : 'metric');
+        });
+    }, [user]);
+
+    useEffect(() => {
+        if (quickMileageToken > 0 && editable) {
+            setIsEditingMileage(true);
+        }
+    }, [editable, quickMileageToken]);
 
     useEffect(() => {
         if (!vehicle.id) return;
@@ -98,16 +117,47 @@ export const MaintenanceInsights = ({
             setMileageError(parsedMileage.error);
             return;
         }
+        const storedMileage = displayDistanceToStoredKm(parsedMileage.value ?? 0, measurementSystem);
+        if (storedMileage > VEHICLE_LIMITS.maxMileage) {
+            setMileageError(t('Mileage is too high.'));
+            return;
+        }
         setMileageError('');
         setSavingMileage(true);
         try {
-            await updateDoc(doc(db, 'vehicles', vehicle.id), {
-                currentMileage: parsedMileage.value ?? 0,
+            const vehicleRef = doc(db, 'vehicles', vehicle.id);
+            const odometerRef = doc(collection(vehicleRef, 'odometerLogs'));
+            const batch = writeBatch(db);
+            batch.update(vehicleRef, {
+                currentMileage: storedMileage,
                 updatedAt: serverTimestamp(),
                 updatedBy: user.uid,
             });
+            batch.set(odometerRef, {
+                organizationId: organizationId || null,
+                vehicleId: vehicle.id,
+                mileage: storedMileage,
+                recordedAt: serverTimestamp(),
+                sourceType: 'manual',
+                sourceId: null,
+                notes: t('Manual odometer update'),
+                createdAt: serverTimestamp(),
+                createdBy: user.uid,
+                updatedAt: serverTimestamp(),
+                updatedBy: user.uid,
+            });
+            await batch.commit();
+            await syncMileageTriggeredMaintenanceReminders({
+                userId: user.uid,
+                vehicle: { ...vehicle, currentMileage: storedMileage },
+                services,
+                ownerType,
+                ownerId: ownerId || user.uid,
+                organizationId: organizationId || null,
+                t,
+            });
             setIsEditingMileage(false);
-            onMessage?.(t('Mileage updated.'));
+            onMessage?.(t('Mileage updated. Maintenance reminders were checked.'));
         } catch {
             onMessage?.(t('Mileage update failed. Please try again.'));
         } finally {
@@ -183,9 +233,9 @@ export const MaintenanceInsights = ({
                                 <p className="mi-label text-primary">{t('Current odometer')}</p>
                                 <div className="mt-3 flex items-end gap-2">
                                     <span className="font-mono text-4xl font-extrabold tracking-tight text-foreground">
-                                        {(vehicle.currentMileage || 0).toLocaleString()}
+                                        {storedKmToDisplayDistance(vehicle.currentMileage || 0, measurementSystem).toLocaleString()}
                                     </span>
-                                    <span className="pb-1 text-sm font-bold text-muted-foreground">{t('km')}</span>
+                                    <span className="pb-1 text-sm font-bold text-muted-foreground">{t(distanceUnit(measurementSystem))}</span>
                                 </div>
                                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
                                     {t('Used for maintenance suggestions, oil changes, tire rotation, brake checks, and service planning.')}
@@ -203,17 +253,18 @@ export const MaintenanceInsights = ({
                                             inputMode="numeric"
                                             maxLength={7}
                                             value={mileageValue}
+                                            label={t('Odometer reading')}
                                             error={mileageError}
                                             onChange={(event) => setMileageValue(event.target.value)}
                                             className="h-10"
                                         />
-                                        <Button type="submit" size="sm" isLoading={savingMileage}>{t('Save km')}</Button>
+                                        <Button type="submit" size="sm" isLoading={savingMileage}>{t('Save odometer')}</Button>
                                         <Button type="button" size="sm" variant="outline" onClick={() => setIsEditingMileage(false)}>{t('Cancel')}</Button>
                                     </form>
                                 ) : (
                                     <Button type="button" size="sm" variant="outline" onClick={() => setIsEditingMileage(true)}>
                                         <Gauge className="mr-2 h-4 w-4" />
-                                        {t('Update km')}
+                                        {t('Update odometer')}
                                     </Button>
                                 )}
                             </div>
@@ -225,7 +276,7 @@ export const MaintenanceInsights = ({
                             <p className="mi-label">{t('Latest service')}</p>
                             <p className="mt-2 break-words text-sm font-semibold">{latestService?.description || t('No service records yet')}</p>
                             <p className="mt-2 font-mono text-xs text-muted-foreground">
-                                {latestService?.mileage ? `${latestService.mileage.toLocaleString()} ${t('km')}` : '-'} · {formatDate(latestService?.date)}
+                                {latestService?.mileage ? formatDistance(latestService.mileage, measurementSystem) : '-'} · {formatDate(latestService?.date)}
                             </p>
                         </Panel>
                         <Panel className="p-4">
@@ -279,9 +330,9 @@ export const MaintenanceInsights = ({
                                 </div>
 
                                 <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                                    <span>{t('Due km')}: <strong className="font-mono text-foreground">{insight.dueMileage ? `${insight.dueMileage.toLocaleString()} ${t('km')}` : '-'}</strong></span>
+                                    <span>{t('Due distance')}: <strong className="font-mono text-foreground">{insight.dueMileage ? formatDistance(insight.dueMileage, measurementSystem) : '-'}</strong></span>
                                     <span>{t('Due date')}: <strong className="font-mono text-foreground">{formatDate(insight.dueDate)}</strong></span>
-                                    <span>{t('Remaining')}: <strong className="font-mono text-foreground">{insight.remainingKm !== undefined ? `${insight.remainingKm.toLocaleString()} ${t('km')}` : '-'}</strong></span>
+                                    <span>{t('Remaining')}: <strong className="font-mono text-foreground">{insight.remainingKm !== undefined ? formatDistance(insight.remainingKm, measurementSystem) : '-'}</strong></span>
                                     <span>{t('Confidence')}: <strong className="text-foreground">{t(insight.confidence)}</strong></span>
                                 </div>
 

@@ -28,11 +28,11 @@ const rememberDismissedWarning = (key: string) => {
 };
 
 export const DevelopmentDisclaimer = ({ className, compact = false }: { className?: string; compact?: boolean }) => (
-    <Panel className={`border-amber-500/30 bg-amber-500/10 ${compact ? 'p-4' : 'p-5'} ${className || ''}`}>
+    <Panel className={`border-border border-l-4 border-l-amber-500 bg-card ${compact ? 'p-4' : 'p-5'} ${className || ''}`}>
         <div className="flex gap-3">
-            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
             <div className="space-y-2">
-                <p className="text-sm font-bold text-amber-200">Active development notice</p>
+                <p className="text-sm font-bold text-foreground">Active development notice</p>
                 <p className="text-sm leading-6 text-muted-foreground">{developmentNoticeText}</p>
                 {!compact && <p className="text-sm leading-6 text-muted-foreground">{pricingNoticeText}</p>}
             </div>
@@ -68,7 +68,7 @@ export const PublicDevelopmentWarning = () => {
                             <ShieldAlert className="h-5 w-5" />
                         </div>
                         <div>
-                            <p className="mi-label text-amber-300">Before you continue</p>
+                            <p className="mi-label text-amber-600 dark:text-amber-400">Before you continue</p>
                             <h2 id="development-warning-title" className="mt-1 text-xl font-bold tracking-tight">Makina Ime is a work-in-progress project</h2>
                         </div>
                     </div>
