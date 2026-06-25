@@ -191,16 +191,20 @@ export const BusinessOperations = ({
         batch.update(vehicleRef, { currentMileage: storedMileage, updatedAt: serverTimestamp(), updatedBy: user.uid });
         await batch.commit();
         if (selectedVehicle) {
-            const servicesSnapshot = await getDocs(query(collection(db, 'vehicles', fuelForm.vehicleId, 'services'), orderBy('date', 'desc')));
-            await syncMileageTriggeredMaintenanceReminders({
-                userId: user.uid,
-                vehicle: { ...selectedVehicle, currentMileage: storedMileage },
-                services: servicesSnapshot.docs.map((item) => ({ id: item.id, vehicleId: fuelForm.vehicleId, ...item.data() }) as ServiceRecord),
-                ownerType: 'organization',
-                ownerId: organizationId,
-                organizationId,
-                t,
-            });
+            try {
+                const servicesSnapshot = await getDocs(query(collection(db, 'vehicles', fuelForm.vehicleId, 'services'), orderBy('date', 'desc')));
+                await syncMileageTriggeredMaintenanceReminders({
+                    userId: user.uid,
+                    vehicle: { ...selectedVehicle, currentMileage: storedMileage },
+                    services: servicesSnapshot.docs.map((item) => ({ id: item.id, vehicleId: fuelForm.vehicleId, ...item.data() }) as ServiceRecord),
+                    ownerType: 'organization',
+                    ownerId: organizationId,
+                    organizationId,
+                    t,
+                });
+            } catch (reminderError) {
+                console.warn('Maintenance reminders could not be synced after fuel mileage update', reminderError);
+            }
         }
         setError('');
         setFuelForm({ vehicleId: vehicles[0]?.id || '', date: new Date().toISOString().slice(0, 10), quantity: '', unitPrice: '', mileage: '', fuelType: 'Diesel', notes: '' });

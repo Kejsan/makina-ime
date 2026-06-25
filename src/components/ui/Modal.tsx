@@ -16,18 +16,34 @@ export const Modal = ({
     onClose,
     titleId,
     className,
+    shouldConfirmClose,
 }: {
     children: ReactNode;
     onClose: () => void;
     titleId?: string;
     className?: string;
+    shouldConfirmClose?: () => boolean;
 }) => {
     const panelRef = useRef<HTMLDivElement>(null);
     const closeRef = useRef(onClose);
+    const confirmCloseRef = useRef(shouldConfirmClose);
+    const hasEditedFormRef = useRef(false);
 
     useEffect(() => {
         closeRef.current = onClose;
     }, [onClose]);
+
+    useEffect(() => {
+        confirmCloseRef.current = shouldConfirmClose;
+    }, [shouldConfirmClose]);
+
+    const requestClose = () => {
+        const shouldBlockClose = confirmCloseRef.current?.() ?? hasEditedFormRef.current;
+        if (shouldBlockClose && !window.confirm('You have unsaved changes. Close without saving?')) {
+            return;
+        }
+        closeRef.current();
+    };
 
     useEffect(() => {
         const scrollY = window.scrollY;
@@ -49,7 +65,7 @@ export const Modal = ({
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
-                closeRef.current();
+                requestClose();
                 return;
             }
             if (event.key !== 'Tab' || !panelRef.current) return;
@@ -79,8 +95,23 @@ export const Modal = ({
     }, []);
 
     const modal = (
-        <div className="mi-modal-scroll fixed inset-0 z-50 overflow-y-auto bg-black/75" role="presentation">
-            <div className="mi-modal-frame flex items-start justify-center sm:items-center">
+        <div
+            className="mi-modal-scroll fixed inset-0 z-50 overflow-y-auto bg-black/75"
+            role="presentation"
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget) {
+                    requestClose();
+                }
+            }}
+        >
+            <div
+                className="mi-modal-frame flex items-start justify-center sm:items-center"
+                onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) {
+                        requestClose();
+                    }
+                }}
+            >
                 <div
                     ref={panelRef}
                     role="dialog"
@@ -88,6 +119,18 @@ export const Modal = ({
                     aria-labelledby={titleId}
                     aria-label={titleId ? undefined : 'Dialog'}
                     className={cn('mi-surface w-full min-w-0 max-w-full p-4 shadow-2xl sm:p-6', className)}
+                    onChangeCapture={(event) => {
+                        const target = event.target;
+                        if (target instanceof HTMLElement && target.closest('form')) {
+                            hasEditedFormRef.current = true;
+                        }
+                    }}
+                    onInputCapture={(event) => {
+                        const target = event.target;
+                        if (target instanceof HTMLElement && target.closest('form')) {
+                            hasEditedFormRef.current = true;
+                        }
+                    }}
                 >
                     {children}
                 </div>

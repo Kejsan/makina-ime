@@ -219,6 +219,16 @@ service cloud.firestore {
       return data.get('updatedBy', request.auth.uid) == request.auth.uid;
     }
 
+    function validMileageOnlyVehicleUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let mileage = request.resource.data.get('currentMileage', 0);
+      return changed.hasOnly(['currentMileage', 'updatedAt', 'updatedBy'])
+        && mileage is int
+        && mileage >= 0
+        && mileage <= 9999999
+        && request.resource.data.get('updatedBy', request.auth.uid) == request.auth.uid;
+    }
+
     function vehicleOwnerUnchanged() {
       return (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
         && (!('ownerType' in request.resource.data) || request.resource.data.ownerType == resource.data.ownerType)
@@ -357,7 +367,12 @@ service cloud.firestore {
         )) && validVehicleData(request.resource.data);
       allow read: if canReadVehicleData(resource.data);
       allow delete: if false;
-      allow update: if canEditVehicleData(resource.data) && vehicleOwnerUnchanged() && validVehicleData(request.resource.data);
+      allow update: if canEditVehicleData(resource.data)
+        && vehicleOwnerUnchanged()
+        && (
+          validVehicleData(request.resource.data)
+          || validMileageOnlyVehicleUpdate()
+        );
 
       match /services/{serviceId} {
         allow read: if ownsVehicle(vehicleId);

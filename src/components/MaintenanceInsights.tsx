@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
 import { AlertTriangle, Bell, CheckCircle2, Gauge, Info, Settings, Wrench } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../lib/firebase';
@@ -126,39 +126,48 @@ export const MaintenanceInsights = ({
         setSavingMileage(true);
         try {
             const vehicleRef = doc(db, 'vehicles', vehicle.id);
-            const odometerRef = doc(collection(vehicleRef, 'odometerLogs'));
-            const batch = writeBatch(db);
-            batch.update(vehicleRef, {
+            await updateDoc(vehicleRef, {
                 currentMileage: storedMileage,
                 updatedAt: serverTimestamp(),
                 updatedBy: user.uid,
             });
-            batch.set(odometerRef, {
-                organizationId: organizationId || null,
-                vehicleId: vehicle.id,
-                mileage: storedMileage,
-                recordedAt: serverTimestamp(),
-                sourceType: 'manual',
-                sourceId: null,
-                notes: t('Manual odometer update'),
-                createdAt: serverTimestamp(),
-                createdBy: user.uid,
-                updatedAt: serverTimestamp(),
-                updatedBy: user.uid,
-            });
-            await batch.commit();
-            await syncMileageTriggeredMaintenanceReminders({
-                userId: user.uid,
-                vehicle: { ...vehicle, currentMileage: storedMileage },
-                services,
-                ownerType,
-                ownerId: ownerId || user.uid,
-                organizationId: organizationId || null,
-                t,
-            });
+
+            try {
+                await addDoc(collection(vehicleRef, 'odometerLogs'), {
+                    organizationId: organizationId || null,
+                    vehicleId: vehicle.id,
+                    mileage: storedMileage,
+                    recordedAt: serverTimestamp(),
+                    sourceType: 'manual',
+                    sourceId: null,
+                    notes: t('Manual odometer update'),
+                    createdAt: serverTimestamp(),
+                    createdBy: user.uid,
+                    updatedAt: serverTimestamp(),
+                    updatedBy: user.uid,
+                });
+            } catch (logError) {
+                console.warn('Odometer history log could not be saved', logError);
+            }
+
+            try {
+                await syncMileageTriggeredMaintenanceReminders({
+                    userId: user.uid,
+                    vehicle: { ...vehicle, currentMileage: storedMileage },
+                    services,
+                    ownerType,
+                    ownerId: ownerId || user.uid,
+                    organizationId: organizationId || null,
+                    t,
+                });
+            } catch (reminderError) {
+                console.warn('Maintenance reminders could not be synced after mileage update', reminderError);
+            }
+
             setIsEditingMileage(false);
             onMessage?.(t('Mileage updated. Maintenance reminders were checked.'));
-        } catch {
+        } catch (error) {
+            console.error('Mileage update failed', error);
             onMessage?.(t('Mileage update failed. Please try again.'));
         } finally {
             setSavingMileage(false);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Bell, Check, Trash2, Clock, Loader2, X } from 'lucide-react';
 import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, orderBy, limit, writeBatch, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -14,6 +14,7 @@ interface NotificationCenterProps {
 
 export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
     const { user } = useAuth();
+    const panelRef = useRef<HTMLDivElement>(null);
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [loading, setLoading] = useState(true);
     const [notificationPermission, setNotificationPermission] = useState(
@@ -40,6 +41,26 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
 
         return unsubscribe;
     }, [user]);
+
+    useEffect(() => {
+        const handlePointerDown = (event: PointerEvent) => {
+            const target = event.target;
+            if (target instanceof Node && panelRef.current && !panelRef.current.contains(target)) {
+                onClose();
+            }
+        };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [onClose]);
 
     const markAsRead = async (id: string) => {
         if (!user) return;
@@ -87,7 +108,7 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
     };
 
     return (
-        <div className="fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 max-h-[calc(100dvh-5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in duration-200 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 sm:max-w-[calc(100dvw-2rem)]">
+        <div ref={panelRef} className="fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 max-h-[calc(100dvh-5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in duration-200 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 sm:max-w-[calc(100dvw-2rem)]">
             <div className="p-4 border-b border-border flex justify-between items-center bg-accent/5">
                 <div className="flex items-center gap-2">
                     <Bell className="w-5 h-5 text-primary" />
