@@ -65,7 +65,7 @@ export const PwaInstallButton = ({ compact = false, autoOffer = false }: { compa
     const overlays = (
         <>
             {showOffer && (
-                <div className="install-offer-panel fixed inset-x-3 z-50 max-w-[calc(100dvw-1.5rem)] overflow-hidden md:hidden" role="region" aria-label={t('Install Makina Ime')}>
+                <div className="install-offer-panel fixed inset-x-3 z-50 max-w-[calc(100dvw-1.5rem)] overflow-x-hidden overflow-y-auto md:hidden" role="region" aria-label={t('Install Makina Ime')}>
                     <AppSurface className="border-primary/30 p-4 shadow-2xl">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Download className="h-5 w-5" /></div>

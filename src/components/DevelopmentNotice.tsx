@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, CheckCircle2, Mail, ShieldAlert, X } from 'lucide-react';
+import { BarChart3, CheckCircle2, Loader2, Send, ShieldAlert, X } from 'lucide-react';
 import { AppSurface, Panel } from './ui/design-system';
 import { Modal } from './ui/Modal';
 
@@ -9,10 +9,10 @@ export const developmentNoticeText = 'Makina Ime is still under active developme
 
 export const pricingNoticeText = 'At this stage, Makina Ime and all currently available features are free while the platform is being developed. Paid plans are expected later, after a more stable version is reached, with a target window in 2026. Timing, pricing, and included features may change before launch.';
 
-const contactEmail = 'infomakinaime@gmail.com';
 const warningStorageKey = 'makina-ime-development-warning-v2';
 const warningReminderIntervalMs = 7 * 24 * 60 * 60 * 1000;
 const warningMaxConfirmations = 2;
+const publicWarningPaths = ['/', '/business-fleet', '/auth', '/privacy', '/terms', '/cookies'];
 
 type WarningAcknowledgement = {
     count: number;
@@ -71,9 +71,8 @@ export const DevelopmentDisclaimer = ({ className, compact = false }: { classNam
 export const PublicDevelopmentWarning = () => {
     const location = useLocation();
     const [dismissedThisSession, setDismissedThisSession] = useState(false);
-    const publicPaths = ['/', '/business-fleet', '/auth', '/privacy', '/terms', '/cookies'];
     const isOpen = useMemo(() => (
-        publicPaths.includes(location.pathname)
+        publicWarningPaths.includes(location.pathname)
         && !dismissedThisSession
         && shouldShowWarning()
     ), [dismissedThisSession, location.pathname]);
@@ -133,37 +132,104 @@ export const PublicDevelopmentWarning = () => {
     );
 };
 
+type InterestFormErrors = Partial<Record<'name' | 'email' | 'accountType' | 'message' | 'accepted' | 'form', string>>;
+type InterestSubmitState = 'idle' | 'submitting' | 'success' | 'error';
+
+const validateInterestForm = ({
+    name,
+    email,
+    accountType,
+    message,
+    accepted,
+}: {
+    name: string;
+    email: string;
+    accountType: string;
+    message: string;
+    accepted: boolean;
+}) => {
+    const errors: InterestFormErrors = {};
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedMessage = message.trim();
+    if (trimmedName.length > 0 && trimmedName.length < 2) errors.name = 'Enter at least 2 characters.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) errors.email = 'Enter a valid email address.';
+    if (!['business', 'personal', 'both'].includes(accountType)) errors.accountType = 'Choose a valid account type.';
+    if (trimmedMessage.length > 1000) errors.message = 'Keep this under 1000 characters.';
+    if (!accepted) errors.accepted = 'Confirm that Makina Ime can save this request and contact you.';
+    return errors;
+};
+
+const getInterestMetadata = () => {
+    const standaloneNavigator = navigator as Navigator & { standalone?: boolean };
+    const installedPwa = window.matchMedia('(display-mode: standalone)').matches || standaloneNavigator.standalone === true;
+    return {
+        referrer: document.referrer || '',
+        language: navigator.language || '',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        displayMode: installedPwa ? 'standalone' : 'browser',
+        installedPwa,
+    };
+};
+
 export const PaidPlanInterestForm = ({ className = '', compact = false }: { className?: string; compact?: boolean }) => {
+    const location = useLocation();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [accountType, setAccountType] = useState('business');
     const [message, setMessage] = useState('');
     const [accepted, setAccepted] = useState(false);
-    const [sent, setSent] = useState(false);
+    const [companyWebsite, setCompanyWebsite] = useState('');
+    const [submitState, setSubmitState] = useState<InterestSubmitState>('idle');
+    const [errors, setErrors] = useState<InterestFormErrors>({});
+    const [savedRequestId, setSavedRequestId] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
 
     const closeForm = () => {
+        if (submitState === 'submitting') return;
         setIsFormOpen(false);
-        setSent(false);
+        setSubmitState('idle');
+        setErrors({});
+        setSavedRequestId('');
     };
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (!accepted) return;
+        const nextErrors = validateInterestForm({ name, email, accountType, message, accepted });
+        setErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0) return;
 
-        const subject = 'Paid plan interest - Makina Ime';
-        const body = [
-            `Name: ${name || 'Not provided'}`,
-            `Email: ${email}`,
-            `Account type: ${accountType}`,
-            '',
-            'Interest: Paid plan with access to all features and analytics.',
-            '',
-            `Message: ${message || 'No additional message.'}`,
-        ].join('\n');
+        setSubmitState('submitting');
+        setSavedRequestId('');
 
-        window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        setSent(true);
+        try {
+            const response = await fetch('/.netlify/functions/paid-plan-interest', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    name: name.trim(),
+                    email: email.trim(),
+                    accountType,
+                    message: message.trim(),
+                    accepted,
+                    companyWebsite,
+                    sourcePath: `${location.pathname}${location.search}${location.hash}`,
+                    metadata: getInterestMetadata(),
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                setErrors(data.errors || { form: 'We could not save this request. Check the details and try again.' });
+                setSubmitState('error');
+                return;
+            }
+            setSavedRequestId(typeof data.requestId === 'string' ? data.requestId : '');
+            setSubmitState('success');
+        } catch {
+            setErrors({ form: 'We could not save this request. Check your connection and try again.' });
+            setSubmitState('error');
+        }
     };
 
     return (
@@ -192,7 +258,7 @@ export const PaidPlanInterestForm = ({ className = '', compact = false }: { clas
             </AppSurface>
 
             {isFormOpen && (
-                <Modal onClose={closeForm} titleId="paid-interest-title" className="max-w-2xl">
+                <Modal onClose={closeForm} titleId="paid-interest-title" className="max-w-2xl" shouldConfirmClose={() => submitState === 'submitting'}>
                     <div className="mb-5 flex items-start justify-between gap-4">
                         <div>
                             <p className="mi-label mb-2 text-primary">Paid plan interest</p>
@@ -221,7 +287,35 @@ export const PaidPlanInterestForm = ({ className = '', compact = false }: { clas
                         ))}
                     </div>
 
+                    {submitState === 'success' ? (
+                        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
+                            <div className="flex items-start gap-3">
+                                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                                <div>
+                                    <p className="font-bold text-foreground">Interest request saved.</p>
+                                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                        Makina Ime now has your paid-plan interest request and contact details. You do not need to send an email manually.
+                                    </p>
+                                    {savedRequestId && (
+                                        <p className="mt-3 text-xs text-muted-foreground">Reference: {savedRequestId}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeForm}
+                                className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    ) : (
                     <form onSubmit={handleSubmit} className="grid gap-4">
+                        {errors.form && (
+                            <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-foreground">
+                                {errors.form}
+                            </p>
+                        )}
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <label className="mi-label" htmlFor="paid-interest-name">Name</label>
@@ -231,7 +325,10 @@ export const PaidPlanInterestForm = ({ className = '', compact = false }: { clas
                                     value={name}
                                     onChange={(event) => setName(event.target.value)}
                                     placeholder="Your name"
+                                    aria-invalid={Boolean(errors.name)}
+                                    aria-describedby={errors.name ? 'paid-interest-name-error' : undefined}
                                 />
+                                {errors.name && <p id="paid-interest-name-error" className="text-xs text-rose-400">{errors.name}</p>}
                             </div>
                             <div className="space-y-2">
                                 <label className="mi-label" htmlFor="paid-interest-email">Email</label>
@@ -243,17 +340,28 @@ export const PaidPlanInterestForm = ({ className = '', compact = false }: { clas
                                     onChange={(event) => setEmail(event.target.value)}
                                     placeholder="name@example.com"
                                     required
+                                    aria-invalid={Boolean(errors.email)}
+                                    aria-describedby={errors.email ? 'paid-interest-email-error' : undefined}
                                 />
+                                {errors.email && <p id="paid-interest-email-error" className="text-xs text-rose-400">{errors.email}</p>}
                             </div>
                         </div>
 
                         <div className="space-y-2">
                             <label className="mi-label" htmlFor="paid-interest-type">Account type</label>
-                            <select id="paid-interest-type" className="mi-field" value={accountType} onChange={(event) => setAccountType(event.target.value)}>
+                            <select
+                                id="paid-interest-type"
+                                className="mi-field"
+                                value={accountType}
+                                onChange={(event) => setAccountType(event.target.value)}
+                                aria-invalid={Boolean(errors.accountType)}
+                                aria-describedby={errors.accountType ? 'paid-interest-type-error' : undefined}
+                            >
                                 <option value="business">Business fleet</option>
                                 <option value="personal">Personal garage</option>
                                 <option value="both">Personal and business</option>
                             </select>
+                            {errors.accountType && <p id="paid-interest-type-error" className="text-xs text-rose-400">{errors.accountType}</p>}
                         </div>
 
                         <div className="space-y-2">
@@ -264,6 +372,24 @@ export const PaidPlanInterestForm = ({ className = '', compact = false }: { clas
                                 value={message}
                                 onChange={(event) => setMessage(event.target.value)}
                                 placeholder="Analytics, team controls, reports, priority support..."
+                                maxLength={1000}
+                                aria-invalid={Boolean(errors.message)}
+                                aria-describedby={errors.message ? 'paid-interest-message-error' : undefined}
+                            />
+                            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                                {errors.message ? <p id="paid-interest-message-error" className="text-rose-400">{errors.message}</p> : <span />}
+                                <span>{message.trim().length}/1000</span>
+                            </div>
+                        </div>
+
+                        <div className="hidden" aria-hidden="true">
+                            <label htmlFor="paid-interest-website">Website</label>
+                            <input
+                                id="paid-interest-website"
+                                tabIndex={-1}
+                                autoComplete="off"
+                                value={companyWebsite}
+                                onChange={(event) => setCompanyWebsite(event.target.value)}
                             />
                         </div>
 
@@ -274,33 +400,32 @@ export const PaidPlanInterestForm = ({ className = '', compact = false }: { clas
                                 checked={accepted}
                                 onChange={(event) => setAccepted(event.target.checked)}
                                 required
+                                aria-invalid={Boolean(errors.accepted)}
                             />
-                            <span>This opens your email app with the details you entered. No interest request is saved unless you send that email.</span>
+                            <span>Makina Ime can save this interest request and use these details to contact me about future paid plans.</span>
                         </label>
+                        {errors.accepted && <p className="-mt-2 text-xs text-rose-400">{errors.accepted}</p>}
 
                         <div className="flex flex-col gap-2 sm:flex-row">
                             <button
                                 type="submit"
-                                className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+                                disabled={submitState === 'submitting'}
+                                className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
                             >
-                                <Mail className="h-4 w-4" />
-                                Register interest
+                                {submitState === 'submitting' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                {submitState === 'submitting' ? 'Saving...' : 'Save interest request'}
                             </button>
                             <button
                                 type="button"
                                 onClick={closeForm}
+                                disabled={submitState === 'submitting'}
                                 className="inline-flex h-11 items-center justify-center rounded-xl border border-input px-5 text-sm font-bold hover:bg-accent"
                             >
                                 Cancel
                             </button>
                         </div>
-
-                        {sent && (
-                            <p className="text-xs leading-5 text-muted-foreground">
-                                Your email app should now be ready with the request. Send it to complete the registration of interest.
-                            </p>
-                        )}
                     </form>
+                    )}
                 </Modal>
             )}
         </>

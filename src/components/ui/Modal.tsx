@@ -11,6 +11,47 @@ const focusableSelector = [
     '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+let modalLockDepth = 0;
+let scrollLockSnapshot: {
+    scrollY: number;
+    bodyOverflow: string;
+    bodyPaddingRight: string;
+    htmlOverflow: string;
+} | null = null;
+
+const lockDocumentScroll = () => {
+    const scrollY = window.scrollY;
+    if (modalLockDepth === 0) {
+        const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+        scrollLockSnapshot = {
+            scrollY,
+            bodyOverflow: document.body.style.overflow,
+            bodyPaddingRight: document.body.style.paddingRight,
+            htmlOverflow: document.documentElement.style.overflow,
+        };
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
+        if (scrollbarWidth > 0) {
+            document.body.style.paddingRight = `${scrollbarWidth}px`;
+        }
+    }
+    modalLockDepth += 1;
+};
+
+const unlockDocumentScroll = () => {
+    modalLockDepth = Math.max(0, modalLockDepth - 1);
+    if (modalLockDepth > 0 || !scrollLockSnapshot) return;
+
+    const { scrollY, bodyOverflow, bodyPaddingRight, htmlOverflow } = scrollLockSnapshot;
+    document.documentElement.style.overflow = htmlOverflow;
+    document.body.style.overflow = bodyOverflow;
+    document.body.style.paddingRight = bodyPaddingRight;
+    scrollLockSnapshot = null;
+    window.requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
+    });
+};
+
 export const Modal = ({
     children,
     onClose,
@@ -46,20 +87,9 @@ export const Modal = ({
     };
 
     useEffect(() => {
-        const scrollY = window.scrollY;
         const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        const body = document.body;
-        const previousStyles = {
-            position: body.style.position,
-            top: body.style.top,
-            width: body.style.width,
-            overflow: body.style.overflow,
-        };
 
-        body.style.position = 'fixed';
-        body.style.top = `-${scrollY}px`;
-        body.style.width = '100%';
-        body.style.overflow = 'hidden';
+        lockDocumentScroll();
         window.requestAnimationFrame(() => panelRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus());
 
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -85,11 +115,7 @@ export const Modal = ({
         document.addEventListener('keydown', handleKeyDown);
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
-            body.style.position = previousStyles.position;
-            body.style.top = previousStyles.top;
-            body.style.width = previousStyles.width;
-            body.style.overflow = previousStyles.overflow;
-            window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
+            unlockDocumentScroll();
             previousFocus?.focus();
         };
     }, []);

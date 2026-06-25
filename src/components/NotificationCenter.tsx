@@ -108,8 +108,8 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
     };
 
     return (
-        <div ref={panelRef} className="fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 max-h-[calc(100dvh-5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in duration-200 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 sm:max-w-[calc(100dvw-2rem)]">
-            <div className="p-4 border-b border-border flex justify-between items-center bg-accent/5">
+        <div ref={panelRef} className="fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 flex max-h-[calc(100dvh-5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in duration-200 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 sm:max-w-[calc(100dvw-2rem)] sm:max-h-[min(32rem,calc(100dvh-6rem))]">
+            <div className="flex shrink-0 items-center justify-between border-b border-border bg-accent/5 p-4">
                 <div className="flex items-center gap-2">
                     <Bell className="w-5 h-5 text-primary" />
                     <h3 className="font-semibold text-foreground">Notifications</h3>
@@ -127,7 +127,7 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
                 </div>
             </div>
 
-            <div className="max-h-[400px] overflow-y-auto p-2 space-y-2 custom-scrollbar">
+            <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-2">
                 {notificationPermission === 'default' && (
                     <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
                         <p className="text-sm font-medium text-foreground">Browser alerts are off</p>
@@ -200,7 +200,7 @@ export const NotificationCenter = ({ onClose }: NotificationCenterProps) => {
                 )}
             </div>
             
-            <div className="p-3 border-t border-border bg-accent/5 text-center">
+            <div className="shrink-0 border-t border-border bg-accent/5 p-3 text-center">
                 <Button variant="ghost" size="sm" className="w-full text-xs" onClick={onClose}>
                     Close
                 </Button>
