@@ -114,6 +114,10 @@ const sendPushNotifications = async ({
       url: '/personal',
     },
     webpush: {
+      headers: {
+        TTL: '3600',
+        Urgency: 'normal',
+      },
       fcmOptions: {
         link: 'https://makinaime.dpdns.org/personal',
       },

@@ -4,7 +4,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { AppSurface, EmptyState, StatusPill } from './ui/design-system';
 import { db } from '../lib/firebase';
-import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, updateDoc, serverTimestamp, Timestamp, getDocs, writeBatch } from 'firebase/firestore';
 import { useParams } from 'react-router-dom';
 import type { Reminder, Vehicle } from '../lib/types';
 import { cn } from '../lib/utils';
@@ -226,12 +226,28 @@ export const ReminderManager = ({
 
     const handleComplete = async (id: string) => {
         if (!confirm('Mark this reminder as completed?')) return;
+        if (!user) return;
         try {
-            await updateDoc(doc(db, 'reminders', id), {
+            const batch = writeBatch(db);
+            batch.update(doc(db, 'reminders', id), {
                 completed: true,
                 updatedAt: serverTimestamp(),
-                updatedBy: user?.uid || null,
+                updatedBy: user.uid,
             });
+
+            const notificationsSnapshot = await getDocs(query(
+                collection(db, 'users', user.uid, 'notifications'),
+                where('reminderId', '==', id),
+                where('read', '==', false)
+            ));
+            notificationsSnapshot.docs.forEach((notificationDoc) => {
+                batch.update(notificationDoc.ref, {
+                    read: true,
+                    readAt: serverTimestamp(),
+                });
+            });
+
+            await batch.commit();
         } catch {
             console.error('Reminder completion failed');
         }

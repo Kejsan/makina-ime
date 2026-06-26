@@ -90,30 +90,21 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setUnreadCount(snapshot.size);
-
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added' && browserNotificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-                    const data = change.doc.data();
-                    new Notification(data.title, {
-                        body: data.body,
-                        icon: '/pwa-192x192.png',
-                    });
-                }
-            });
         });
 
         return unsubscribe;
-    }, [user, browserNotificationsEnabled]);
+    }, [user]);
 
     useEffect(() => {
         if (!user || !browserNotificationsEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
         void registerPushDevice(user.uid).catch(() => null);
 
         let unsubscribe: (() => void) | undefined;
-        void subscribeForegroundPushMessages(({ title, body }) => {
+        void subscribeForegroundPushMessages(({ title, body, tag }) => {
             new Notification(title, {
                 body,
                 icon: '/pwa-192x192.png',
+                tag,
             });
         }).then((nextUnsubscribe) => {
             unsubscribe = nextUnsubscribe;

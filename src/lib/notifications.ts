@@ -101,7 +101,7 @@ export const disableCurrentPushDevice = async (userId: string) => {
 };
 
 export const subscribeForegroundPushMessages = async (
-    listener: (payload: { title: string; body?: string }) => void
+    listener: (payload: { title: string; body?: string; tag?: string }) => void
 ) => {
     const messaging = await getSupportedMessaging();
     if (!messaging) return () => undefined;
@@ -110,6 +110,7 @@ export const subscribeForegroundPushMessages = async (
         listener({
             title: payload.notification?.title || payload.data?.title || 'Makina Ime reminder',
             body: payload.notification?.body || payload.data?.body,
+            tag: payload.data?.notificationId || payload.data?.reminderId,
         });
     });
 };
